@@ -60,7 +60,7 @@ export class WebGPURenderer {
     this.positionBuffer.unmap();
 
     this.colorBuffer = this.device.createBuffer({
-      size: colors.length * 12,
+      size: colors.length * 4,
       usage: GPUBufferUsage.VERTEX,
       mappedAtCreation: true,
     });

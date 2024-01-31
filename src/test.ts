@@ -145,7 +145,7 @@ export const Initialize = async () => {
   
   const sceneManager = new WebGPURenderer("gfx-main");
   sceneManager.init().then(() => {
-    sceneManager.createParticles(100); // Create 100 particles
+    sceneManager.createParticles(9999); // Create 100 particles
     sceneManager.createBuffers();
     sceneManager.createPipeline();
     sceneManager.render();
