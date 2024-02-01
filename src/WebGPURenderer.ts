@@ -1,21 +1,31 @@
-import { Particle } from "./particle";
+// import { Particle } from "./particle";
 import { mat4, vec3 } from 'gl-matrix';
 
 export class WebGPURenderer {
     private canvas: HTMLCanvasElement;
     private device!: GPUDevice;
     private context!: GPUCanvasContext;
-    private format: GPUTextureFormat = "bgra8unorm";
-    private particles: Particle[];
+    private format!: GPUTextureFormat;
+    
     private pipeline!: GPURenderPipeline;
     private computePipeline!: GPUComputePipeline;
-    private particleBuffer!: GPUBuffer;
-    private queue!: GPUQueue;
     private computeBindGroup!: GPUBindGroup;
+    private mvpUniformBuffer!: GPUBuffer;
+    private renderBindGroup!: GPUBindGroup;
+    
+    private positions: number[];
+    private velocities: number[];
+    
+    private positionBuffer!: GPUBuffer;
+    private velocityBuffer!: GPUBuffer;
+
+    numParticles:number = 0;
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
-        this.particles = [];
+        this.positions = [];
+        this.velocities = [];
+        console.log("생성");
     }
 
     async init() {
@@ -24,96 +34,132 @@ export class WebGPURenderer {
             throw new Error("Failed to get GPU adapter");
         }
         this.device = await adapter?.requestDevice();
-        this.context = this.canvas.getContext("webgpu") as GPUCanvasContext;
+        this.context = <GPUCanvasContext>this.canvas.getContext("webgpu");
+        this.format = "bgra8unorm";
         this.context.configure({
             device: this.device,
             format: this.format,
             alphaMode: "opaque",
         });
-        this.queue = this.device.queue;
     }
 
+    async readBackPositionBuffer() {
+        // Create a GPUBuffer for reading back the data
+        const readBackBuffer = this.device.createBuffer({
+            size: this.positionBuffer.size,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+    
+        // Create a command encoder and copy the position buffer to the readback buffer
+        const commandEncoder = this.device.createCommandEncoder();
+        commandEncoder.copyBufferToBuffer(this.positionBuffer, 0, readBackBuffer, 0, this.positionBuffer.size);
+        
+        // Submit the command to the GPU queue
+        const commands = commandEncoder.finish();
+        this.device.queue.submit([commands]);    
+    
+        // Map the readback buffer for reading and read its contents
+        await readBackBuffer.mapAsync(GPUMapMode.READ);
+        const arrayBuffer = readBackBuffer.getMappedRange(0, this.positionBuffer.size);
+        const data = new Float32Array(arrayBuffer);
+        console.log('Position Buffer Data:', data);
+    
+        // Cleanup
+        readBackBuffer.unmap();
+        readBackBuffer.destroy();
+    }
+    
     createParticles(numParticles: number) {
+        this.numParticles = numParticles;
         for (let i = 0; i < numParticles; i++) {
             const position: [number, number, number] = [
-                Math.random() * 2 - 1, // Random position in range [-1, 1]
-                Math.random() * 2 - 1,
-                Math.random() * 2 - 1,
+                Math.random() * 10 - 5.0, // Random position in range [-1, 1]
+                Math.random() * 10 + 5.0,
+                0.0,
             ];
-            const color: [number, number, number] = [
-                Math.random(), // Random color
-                Math.random(),
-                Math.random(),
-            ];
-            const velocity: [number, number, number] = [0, 0, 0]; // Initial velocity
-            this.particles.push(new Particle(position, color, velocity));
+            const velocity: [number, number, number] = [0.0, 0.0, 0.0]; // Initial velocity
+            this.positions.push(...position);
+            this.velocities.push(...velocity);
+
+            console.log(position, velocity);
         }
     }
 
     createBuffers() {
-        const particleData = new Float32Array(this.particles.length * 9);
-        for (let i = 0; i < this.particles.length; i++) {
-            particleData.set([...this.particles[i].position, ...this.particles[i].color, ...this.particles[i].velocity], i * 9);
-        }
+        // Position buffer creation
+        const positionData = new Float32Array(this.positions);
+        const bufferSize = this.numParticles * 3 * 4; // Correct size calculation
 
-        this.particleBuffer = this.device.createBuffer({
-            size: particleData.byteLength,
+        this.positionBuffer = this.device.createBuffer({
+            size: bufferSize, // Use the calculated size
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true,
         });
+        new Float32Array(this.positionBuffer.getMappedRange()).set(positionData);        
+        this.positionBuffer.unmap();
+    
+        // Velocity buffer creation
+        const velocityData = new Float32Array(this.velocities);
+        this.velocityBuffer = this.device.createBuffer({
+            size: velocityData.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        new Float32Array(this.velocityBuffer.getMappedRange()).set(velocityData); // Corrected to set velocityData
+        this.velocityBuffer.unmap();
 
-        new Float32Array(this.particleBuffer.getMappedRange()).set(particleData);
-        this.particleBuffer.unmap();
+        this.readBackPositionBuffer();
     }
-
 
     createComputePipeline() {
         const computeShader = `
-    @group(0) @binding(0) var<storage, read_write> particles : array<Particle>;
+        @group(0) @binding(0) var<storage, read_write> positions : array<vec3<f32>>;
+        @group(0) @binding(1) var<storage, read_write> velocities : array<vec3<f32>>;
+    
+        const gravity: vec3<f32> = vec3<f32>(0.0, -9.81, 0.0);
+        const deltaTime: f32 = 0.01;
 
-    struct Particle {
-        position: vec3<f32>,
-        color: vec3<f32>,
-        velocity: vec3<f32>,
-    };
+        @compute @workgroup_size(64)
+        fn cs_main(@builtin(global_invocation_id) id : vec3<u32>) {
+            let i = i32(id.x);
 
-    const gravity:vec3<f32> = vec3<f32>(0.0, -9.81, 0.0);
-    const deltaTime: f32 = 0.001; // Assuming 60 FPS for simulation
-
-    @compute @workgroup_size(64)
-    fn cs_main(@builtin(global_invocation_id) id : vec3<u32>) {
-        let i = id.x;
-        if (i >= arrayLength(&particles)) {
-            return;
+            if(positions[i].y <0.0){
+                velocities[i] *=  -0.97;
+                positions[i].y = 0.01;
+            }
+    
+            // Simulate gravity effect on velocity            
+            velocities[i] += (gravity * deltaTime);
+    
+            // Update position based on velocity
+            positions[i] += (velocities[i] * deltaTime);
         }
-
-        
-
-        // Update velocity based on gravity
-        particles[i].velocity = particles[i].velocity + (gravity * deltaTime);
-
-        // Update position based on velocity
-        particles[i].position = particles[i].position + (particles[i].velocity * deltaTime);
-    }
-    `;
-
-
+        `;
+    
         const computeShaderModule = this.device.createShaderModule({
             code: computeShader,
         });
-
-        // Create the bind group layout for the particle buffer
+    
+        // Update the bind group layout to include both positions and velocities
         const bindGroupLayout = this.device.createBindGroupLayout({
-            entries: [{
-                binding: 0,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer: {
-                    type: 'storage',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: 'storage',
+                    },
                 },
-            }],
+                {
+                    binding: 1, // Add this entry for the velocities buffer
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: 'storage',
+                    },
+                }
+            ],
         });
-
-        // Create the compute pipeline
+    
         this.computePipeline = this.device.createComputePipeline({
             layout: this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
             compute: {
@@ -121,67 +167,99 @@ export class WebGPURenderer {
                 entryPoint: 'cs_main',
             },
         });
-
-        // Create the particle buffer
-        // Assuming `this.particleBuffer` is already created and contains particles data
+    
+        // Assuming positionBuffer and velocityBuffer are already created and contain data
         this.computeBindGroup = this.device.createBindGroup({
             layout: bindGroupLayout,
-            entries: [{
-                binding: 0,
-                resource: {
-                    buffer: this.particleBuffer,
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: this.positionBuffer,
+                    },
                 },
-            }],
+                {
+                    binding: 1, // Ensure this matches the velocities buffer
+                    resource: {
+                        buffer: this.velocityBuffer,
+                    },
+                }
+            ],
         });
     }
-
+    
 
     dispatchComputeShader() {
-        const commandEncoder = this.device.createCommandEncoder();
-
-        const computePass = commandEncoder.beginComputePass();
-        computePass.setPipeline(this.computePipeline);
-        computePass.setBindGroup(0, this.computeBindGroup);
-        const numWorkgroups = Math.ceil(this.particles.length / 64);
-        computePass.dispatchWorkgroups(numWorkgroups, 1, 1);
-        computePass.end();
-
-        this.queue.submit([commandEncoder.finish()]);
+        
     }
-
-
 
     createPipeline() {
         // Shader Module
-        const shaders = `struct VertexInput {
-      @location(0) position : vec3<f32>,
-      @location(1) color : vec3<f32>,
-    };
-  
-    struct Fragment {
-      @builtin(position) Position : vec4<f32>,
-      @location(0) Color : vec4<f32>,
-    };
-  
-    @vertex
-    fn vs_main(vertexInput: VertexInput) -> Fragment {
-      var output : Fragment;
-      output.Position = vec4<f32>(vertexInput.position, 1.0);
-      output.Color = vec4<f32>(vertexInput.color, 1.0);
-      return output;
-    }
-  
-    @fragment
-    fn fs_main(@location(0) Color: vec4<f32>) -> @location(0) vec4<f32> {
-      return Color;
-    }`;
+        
+        const shader = `struct TransformData {
+            model: mat4x4<f32>,
+            view: mat4x4<f32>,
+            projection: mat4x4<f32>,
+        };
+        @group(0) @binding(0) var<uniform> transformUBO: TransformData;
 
-        console.log(shaders);
+struct VertexInput {
+    @location(0) position : vec3<f32>
+};
 
-        const shaderModule = this.device.createShaderModule({ code: shaders });
+struct FragmentOutput {
+    @builtin(position) Position : vec4<f32>,
+    @location(0) Color : vec4<f32>
+};
+
+@vertex
+fn vs_main(vertexInput: VertexInput) -> FragmentOutput {
+    var output : FragmentOutput;
+    let modelViewProj = transformUBO.projection * transformUBO.view * transformUBO.model;
+    output.Position = modelViewProj * vec4<f32>(vertexInput.position, 1.0);
+    output.Color = vec4<f32>(1.0, 0.0, 0.0, 1.0); // Fixed color for all particles
+
+    return output;
+}
+
+@fragment
+fn fs_main(in: FragmentOutput) -> @location(0) vec4<f32> {
+    return in.Color;
+}
+
+        `;
+
+        const shaderModule = this.device.createShaderModule({ code: shader });
 
         // Bind Group Layout (if any resources need to be bound to the pipeline)
-        const bindGroupLayout = this.device.createBindGroupLayout({ entries: [] });
+        const bindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: {}
+                }
+            ]
+
+        });
+
+        // Attach mvp matrix uniform buffer
+        this.mvpUniformBuffer = this.device.createBuffer({
+            size: 64 * 3,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
+        
+        this.renderBindGroup = this.device.createBindGroup({
+            layout: bindGroupLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: this.mvpUniformBuffer
+                    }
+                }
+            ]
+        });
 
         // Pipeline Layout
         const pipelineLayout = this.device.createPipelineLayout({
@@ -194,24 +272,16 @@ export class WebGPURenderer {
             vertex: {
                 module: shaderModule,
                 entryPoint: "vs_main",
-                buffers: [
-                    {
-                        arrayStride: 12, // size of each position vertex (vec2<f32>)
-                        attributes: [{ // Position attribute
-                            shaderLocation: 0,
-                            offset: 0,
-                            format: "float32x2"
-                        }]
-                    },
-                    {
-                        arrayStride: 12, // size of each color vertex (vec3<f32>)
-                        attributes: [{ // Color attribute
-                            shaderLocation: 1,
-                            offset: 0,
-                            format: "float32x3"
-                        }]
-                    }
-                ]
+                buffers: [{
+                    // Assuming position data is now solely in this buffer
+                    arrayStride: 12, // 3 floats * 4 bytes per float
+                    attributes: [{
+                        // Position attribute
+                        shaderLocation: 0,
+                        offset: 0,
+                        format: "float32x3"
+                    }]
+                }]
             },
             fragment: {
                 module: shaderModule,
@@ -219,59 +289,59 @@ export class WebGPURenderer {
                 targets: [{ format: this.format }],
             },
             primitive: {
-                topology: "point-list", // or "point-list" if you are drawing points
-            },
+                topology: "point-list",
+            }
         });
     }
 
     setCamera(){
+        const projection = mat4.create();
+        mat4.perspective(projection, Math.PI / 4.0, this.canvas.width / this.canvas.height, 0.1, 1000.0);
 
-        const cameraPosition = vec3.fromValues(0.0, 15.0, 10.0);
-        const cameraTarget = vec3.fromValues(0, 0, 0);
-        const cameraUp = vec3.fromValues(0, 1, 0);
-        
-        const viewMatrix = mat4.lookAt(mat4.create(), cameraPosition, cameraTarget, cameraUp);
-        const projectionMatrix = mat4.perspective(mat4.create(), Math.PI / 4, this.canvas.width / this.canvas.height, 0.1, 100.0);
+        const view = mat4.create();
+        mat4.lookAt(view, [0, 20, 150], [0, 0, 0], [0, 1, 0]);
 
-        // Create buffers for view and projection matrices
-        const viewMatrixBuffer = this.device.createBuffer({
-            size: 16 * 4, // 4x4 matrix, 16 bytes per float
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
+        const model = mat4.create();          
 
-        const projectionMatrixBuffer = this.device.createBuffer({
-            size: 16 * 4, // 4x4 matrix, 16 bytes per float
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
+        this.device.queue.writeBuffer(this.mvpUniformBuffer, 0, <ArrayBuffer>model); 
+        this.device.queue.writeBuffer(this.mvpUniformBuffer, 64, <ArrayBuffer>view); 
+        this.device.queue.writeBuffer(this.mvpUniformBuffer, 128, <ArrayBuffer>projection); 
     }
 
-    render() {
-        this.dispatchComputeShader();
-
+    async render() {
         const commandEncoder = this.device.createCommandEncoder();
-        const textureView = this.context.getCurrentTexture().createView();
-
+    
+        try {
+            const computePass = commandEncoder.beginComputePass();
+            computePass.setPipeline(this.computePipeline); // Ensure this.computePipeline is a GPUComputePipeline
+            computePass.setBindGroup(0, this.computeBindGroup);
+            const numWorkgroups = Math.floor(this.numParticles / 64)+1;
+            computePass.dispatchWorkgroups(numWorkgroups, 1, 1);
+            computePass.end();
+    
+        } catch (error) {
+            console.error("Error dispatching compute shader:", error);
+        }
         
-        const renderPassDescriptor: GPURenderPassDescriptor = {
+        // await this.device.queue.onSubmittedWorkDone();
+        // await this.readBackPositionBuffer();
+
+        const renderpass : GPURenderPassEncoder = commandEncoder.beginRenderPass({
             colorAttachments: [{
-                view: textureView,
-                loadOp: 'clear',
-                clearValue: { r: 0.25, g: 0.25, b: 0.25, a: 1.0 },
-                storeOp: 'store',
-            }],   
-        };
+                view: this.context.getCurrentTexture().createView(),
+                clearValue: {r: 0.25, g: 0.25, b: 0.25, a: 1.0},
+                loadOp: "clear",
+                storeOp: "store"
+            }]
+        });
 
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-        passEncoder.setPipeline(this.pipeline);
-        passEncoder.setVertexBuffer(0, this.particleBuffer);
-        passEncoder.setVertexBuffer(1, this.particleBuffer, this.particles.length * 4 * 3);
+        this.setCamera();
+        renderpass.setPipeline(this.pipeline);
+        renderpass.setVertexBuffer(0, this.positionBuffer); // Use positionBuffer for rendering
+        renderpass.setBindGroup(0, this.renderBindGroup);
+        renderpass.draw(this.numParticles, 1, 0, 0); // Draw call matches the number of particles
+        renderpass.end();
 
-        const emptyBindGroup = this.device.createBindGroup({ layout: this.pipeline.getBindGroupLayout(0), entries: [] });
-        passEncoder.setBindGroup(0, emptyBindGroup);
-
-        passEncoder.draw(this.particles.length, 1, 0, 0);
-        passEncoder.end();
-
-        this.queue.submit([commandEncoder.finish()]);
+        this.device.queue.submit([commandEncoder.finish()]);
     }
 }

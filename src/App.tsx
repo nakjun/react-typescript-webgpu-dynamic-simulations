@@ -1,9 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Initialize } from './test';
 
-function App() {
+function App() {  
+  
+  let start = false;
+
   useEffect(() => {
-    Initialize();
+    if(!start) {
+      Initialize();
+      start = true;
+    }
   }, []);
 
   return (
