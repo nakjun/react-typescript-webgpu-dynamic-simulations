@@ -141,13 +141,25 @@ import { WebGPURenderer } from "./WebGPURenderer";
 // };
 
 
-export const Initialize = async () => {
-  
+export const Initialize = async () => {  
   const sceneManager = new WebGPURenderer("gfx-main");
   sceneManager.init().then(() => {
-    sceneManager.createParticles(9999); // Create 100 particles
+    sceneManager.createParticles(100); // Create 100 particles
     sceneManager.createBuffers();
-    sceneManager.createPipeline();
-    sceneManager.render();
+    sceneManager.createComputePipeline();
+    sceneManager.createPipeline();    
+    animate();
   });
+
+  // Create an animation loop function
+  function animate() {
+    // Update the particle simulation (e.g., call your compute shader)
+    sceneManager.dispatchComputeShader();
+
+    // Render the scene (e.g., call your render function)
+    sceneManager.render();
+
+    // Request the next frame
+    requestAnimationFrame(animate);
+  }
 }
