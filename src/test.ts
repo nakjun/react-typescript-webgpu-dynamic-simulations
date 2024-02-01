@@ -1,6 +1,5 @@
 import { Particle } from "./particle";
 import { WebGPURenderer } from "./WebGPURenderer";
-import { Renderer } from "./Render";
 
 
 export const Initialize = async () => {  

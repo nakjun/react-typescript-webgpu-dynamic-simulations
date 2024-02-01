@@ -176,12 +176,16 @@ export class WebGPURenderer {
                     binding: 0,
                     resource: {
                         buffer: this.positionBuffer,
+                        size: this.positionBuffer.size,
+                        offset: 0,
                     },
                 },
                 {
                     binding: 1, // Ensure this matches the velocities buffer
                     resource: {
                         buffer: this.velocityBuffer,
+                        size: this.velocityBuffer.size,
+                        offset: 0,
                     },
                 }
             ],
@@ -322,9 +326,6 @@ fn fs_main(in: FragmentOutput) -> @location(0) vec4<f32> {
         } catch (error) {
             console.error("Error dispatching compute shader:", error);
         }
-        
-        // await this.device.queue.onSubmittedWorkDone();
-        // await this.readBackPositionBuffer();
 
         const renderpass : GPURenderPassEncoder = commandEncoder.beginRenderPass({
             colorAttachments: [{
