@@ -243,6 +243,10 @@ export class Renderer extends RendererOrigin{
         );
     }
     async render() {        
+        
+        const currentTime = performance.now();
+        this.frameCount++;
+        
         const commandEncoder = this.device.createCommandEncoder();
         const computePass = commandEncoder.beginComputePass();
         computePass.setPipeline(this.computePipeline);
@@ -277,6 +281,22 @@ export class Renderer extends RendererOrigin{
         passEncoder.end();
 
         this.device.queue.submit([commandEncoder.finish()]);
+
+        if (currentTime - this.lastTime >= 1000) {
+            // Calculate the FPS.
+            const fps = this.frameCount;
+    
+            // Optionally, display the FPS in the browser.
+            if (this.fpsDisplay) {
+                this.fpsDisplay.textContent = `FPS: ${fps}`;
+            } else {
+                console.log(`FPS: ${fps}`);
+            }
+    
+            // Reset the frame count and update the last time check.
+            this.frameCount = 0;
+            this.lastTime = currentTime;
+        }
     }
     
 }

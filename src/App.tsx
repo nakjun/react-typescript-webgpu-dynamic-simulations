@@ -13,7 +13,8 @@ function App() {
   }, []);
 
   return (
-    <div className="App">
+    <div className="App">      
+      <div id="fpsDisplay"></div>
       <canvas id="gfx-main" width="800" height="600"></canvas>
     </div>
   );

@@ -79,7 +79,7 @@ export class Shader {
         let deltaTime: f32 = 0.005; // Assuming 60 FPS for simplicity
         
         if(pos.y < 0.0) {
-            pos.y = 0.0001;
+            pos.y = 0.01;
             vel *= -0.95;
         }
 

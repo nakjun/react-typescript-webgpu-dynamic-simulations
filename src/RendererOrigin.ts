@@ -18,6 +18,10 @@ export class RendererOrigin {
     camera_target: vec3 = vec3.fromValues(0.0, 0.0, 0.0);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
+    //fps
+    frameCount: number = 0;
+    lastTime: number = 0;
+    fpsDisplay;
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -31,6 +35,7 @@ export class RendererOrigin {
             100 // far
         );
         console.log("Renderer initialized");
+        this.fpsDisplay = document.getElementById('fpsDisplay');
     }
 
     async init() {
