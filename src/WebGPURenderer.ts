@@ -1,6 +1,5 @@
-// import { Particle } from "./particle";
 import { mat4, vec3 } from 'gl-matrix';
-
+import { Shader } from './Shader';
 export class WebGPURenderer {
     private canvas: HTMLCanvasElement;
     private device!: GPUDevice;
@@ -21,10 +20,21 @@ export class WebGPURenderer {
 
     numParticles:number = 0;
 
+    //axis render
+    private axisVertices!: number[];
+    private axisVertexBuffer!: GPUBuffer;
+
+    //shader
+    private shader!: Shader;
+
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.positions = [];
         this.velocities = [];
+        this.axisVertices = [];
+
+        this.shader = new Shader();
+
         console.log("생성");
     }
 
@@ -92,7 +102,7 @@ export class WebGPURenderer {
 
         this.positionBuffer = this.device.createBuffer({
             size: bufferSize, // Use the calculated size
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true,
         });
         new Float32Array(this.positionBuffer.getMappedRange()).set(positionData);        
@@ -102,13 +112,11 @@ export class WebGPURenderer {
         const velocityData = new Float32Array(this.velocities);
         this.velocityBuffer = this.device.createBuffer({
             size: velocityData.byteLength,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true,
         });
         new Float32Array(this.velocityBuffer.getMappedRange()).set(velocityData); // Corrected to set velocityData
         this.velocityBuffer.unmap();
-
-        this.readBackPositionBuffer();
     }
 
     createComputePipeline() {
@@ -191,49 +199,46 @@ export class WebGPURenderer {
             ],
         });
     }
-    
 
     dispatchComputeShader() {
         
     }
 
+    generateAxisVertices() {
+        const axisLength = 100.0; // Length of each axis
+        // X axis in red
+        this.axisVertices.push(
+            0, 0, 0, 1, 0, 0, // Start point (red)
+            axisLength, 0, 0, 1, 0, 0  // End point (red)
+        );
+        // Y axis in green
+        this.axisVertices.push(
+            0, 0, 0, 0, 1, 0, // Start point (green)
+            0, axisLength, 0, 0, 1, 0  // End point (green)
+        );
+        // Z axis in blue
+        this.axisVertices.push(
+            0, 0, 0, 0, 0, 1, // Start point (blue)
+            0, 0, axisLength, 0, 0, 1  // End point (blue)
+        );
+    }
+
+    createAxisVertexBuffer() {
+        const axisData = new Float32Array(this.axisVertices);
+        this.axisVertexBuffer = this.device.createBuffer({
+            size: axisData.byteLength,
+            usage: GPUBufferUsage.VERTEX,
+            mappedAtCreation: true,
+        });
+        new Float32Array(this.axisVertexBuffer.getMappedRange()).set(axisData);
+        this.axisVertexBuffer.unmap();
+    }
+
     createPipeline() {
         // Shader Module
         
-        const shader = `struct TransformData {
-            model: mat4x4<f32>,
-            view: mat4x4<f32>,
-            projection: mat4x4<f32>,
-        };
-        @group(0) @binding(0) var<uniform> transformUBO: TransformData;
-
-struct VertexInput {
-    @location(0) position : vec3<f32>
-};
-
-struct FragmentOutput {
-    @builtin(position) Position : vec4<f32>,
-    @location(0) Color : vec4<f32>
-};
-
-@vertex
-fn vs_main(vertexInput: VertexInput) -> FragmentOutput {
-    var output : FragmentOutput;
-    let modelViewProj = transformUBO.projection * transformUBO.view * transformUBO.model;
-    output.Position = modelViewProj * vec4<f32>(vertexInput.position, 1.0);
-    output.Color = vec4<f32>(1.0, 0.0, 0.0, 1.0); // Fixed color for all particles
-
-    return output;
-}
-
-@fragment
-fn fs_main(in: FragmentOutput) -> @location(0) vec4<f32> {
-    return in.Color;
-}
-
-        `;
-
-        const shaderModule = this.device.createShaderModule({ code: shader });
+        const render_shader = this.shader.getRenderShader();
+        const shaderModule = this.device.createShaderModule({ code: render_shader });
 
         // Bind Group Layout (if any resources need to be bound to the pipeline)
         const bindGroupLayout = this.device.createBindGroupLayout({
@@ -315,17 +320,17 @@ fn fs_main(in: FragmentOutput) -> @location(0) vec4<f32> {
     async render() {
         const commandEncoder = this.device.createCommandEncoder();
     
-        try {
-            const computePass = commandEncoder.beginComputePass();
-            computePass.setPipeline(this.computePipeline); // Ensure this.computePipeline is a GPUComputePipeline
-            computePass.setBindGroup(0, this.computeBindGroup);
-            const numWorkgroups = Math.floor(this.numParticles / 64)+1;
-            computePass.dispatchWorkgroups(numWorkgroups, 1, 1);
-            computePass.end();
+        // try {
+        //     const computePass = commandEncoder.beginComputePass();
+        //     computePass.setPipeline(this.computePipeline); // Ensure this.computePipeline is a GPUComputePipeline
+        //     computePass.setBindGroup(0, this.computeBindGroup);
+        //     const numWorkgroups = Math.floor(this.numParticles / 64)+1;
+        //     computePass.dispatchWorkgroups(numWorkgroups, 1, 1);
+        //     computePass.end();
     
-        } catch (error) {
-            console.error("Error dispatching compute shader:", error);
-        }
+        // } catch (error) {
+        //     console.error("Error dispatching compute shader:", error);
+        // }
 
         const renderpass : GPURenderPassEncoder = commandEncoder.beginRenderPass({
             colorAttachments: [{
@@ -338,9 +343,11 @@ fn fs_main(in: FragmentOutput) -> @location(0) vec4<f32> {
 
         this.setCamera();
         renderpass.setPipeline(this.pipeline);
-        renderpass.setVertexBuffer(0, this.positionBuffer); // Use positionBuffer for rendering
         renderpass.setBindGroup(0, this.renderBindGroup);
-        renderpass.draw(this.numParticles, 1, 0, 0); // Draw call matches the number of particles
+        renderpass.setVertexBuffer(0, this.positionBuffer); // Use positionBuffer for rendering
+        renderpass.draw(this.numParticles); // Draw call matches the number of particles        
+        // renderpass.setVertexBuffer(0, this.axisVertexBuffer);
+        // renderpass.draw(6); // 6 vertices for the 3 line segments
         renderpass.end();
 
         this.device.queue.submit([commandEncoder.finish()]);

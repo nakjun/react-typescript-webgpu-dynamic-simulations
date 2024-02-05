@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Initialize } from './test';
+import { Initialize } from './RenderModule';
 
 function App() {  
   
