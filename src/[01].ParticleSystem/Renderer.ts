@@ -1,7 +1,6 @@
 import { mat4, vec3 } from 'gl-matrix';
-import { Camera } from './Camera';
-import { Shader } from '../ParticleSystem/Shader';
-import { Model } from '../Cube/Model';
+import { Camera } from '../WebGPU/Camera';
+import { Shader } from './Shader';
 import { RendererOrigin} from '../RendererOrigin';
 
 export class Renderer extends RendererOrigin{    
@@ -9,7 +8,7 @@ export class Renderer extends RendererOrigin{
 
     private computePipeline!: GPUComputePipeline;
     private computeBindGroup!: GPUBindGroup;
-    private mvpUniformBuffer!: GPUBuffer;
+    
     private renderBindGroup!: GPUBindGroup;
     private numParticlesBuffer!: GPUBuffer;
     
@@ -245,21 +244,7 @@ export class Renderer extends RendererOrigin{
         this.computePipeline = computePipeline;
     }
 
-    setCamera(camera: Camera) {
-        // Projection matrix: Perspective projection
-        const projection = mat4.create();
-        mat4.perspective(projection, camera.fov, this.canvas.width / this.canvas.height, camera.near, camera.far);
     
-        // View matrix: Camera's position and orientation in the world
-        const view = mat4.create();
-        mat4.lookAt(view, camera.position, camera.target, camera.up);
-    
-        // Model matrix: For now, we can use an identity matrix if we're not transforming the particles
-        const model = mat4.create(); // No transformation to the model
-    
-        // Now, update the buffer with these matrices
-        this.updateUniformBuffer(model, view, projection);
-    }
 
     updateParticles() {
         const commandEncoder = this.device.createCommandEncoder();
@@ -271,22 +256,7 @@ export class Renderer extends RendererOrigin{
     }
     
 
-    updateUniformBuffer(model: mat4, view: mat4, projection: mat4) {
-        // Combine the matrices into a single Float32Array
-        const data = new Float32Array(48); // 16 floats per matrix, 3 matrices
-        data.set(model);
-        data.set(view, 16); // Offset by 16 floats for the view matrix
-        data.set(projection, 32); // Offset by 32 floats for the projection matrix
     
-        // Upload the new data to the GPU
-        this.device.queue.writeBuffer(
-            this.mvpUniformBuffer,
-            0, // Start at the beginning of the buffer
-            data.buffer, // The ArrayBuffer of the Float32Array
-            0, // Start at the beginning of the data
-            data.byteLength // The amount of data to write
-        );
-    }
     async render() {        
         
         const currentTime = performance.now();

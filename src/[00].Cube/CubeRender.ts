@@ -1,7 +1,7 @@
 import { mat4, vec3 } from 'gl-matrix';
 import { Camera } from '../WebGPU/Camera';
-import { Shader } from '../ParticleSystem/Shader';
-import { Model } from '../Cube/Model';
+import { Shader } from '../[00].Cube/Shader';
+import { Model } from './Model';
 
 export class CubeRender{
 

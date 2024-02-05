@@ -15,7 +15,7 @@ function App() {
   return (
     <div className="App">      
       <div id="fpsDisplay"></div>
-      <canvas id="gfx-main" width="800" height="600"></canvas>
+      <canvas id="gfx-main" width="1920" height="800"></canvas>
     </div>
   );
 }

@@ -1,15 +1,14 @@
-import { Renderer } from "./WebGPU/Renderer";
+import { Renderer } from "./[01].ParticleSystem/Renderer";
+import { ClothRenderer } from "./[02].ClothSystem/Renderer";
 
 
 export const Initialize = async () => {    
-  const sceneManager = new Renderer("gfx-main");
+  const sceneManager = new ClothRenderer("gfx-main");
   sceneManager.init().then(() => {    
-    sceneManager.createParticles(2000);
-    sceneManager.createParticleBuffers();
+    sceneManager.createClothModel(64, 64, 1000, 0.01);
+    sceneManager.createClothBuffers();
     sceneManager.createParticlePipeline();
-
-    sceneManager.createComputePipeline();
-    sceneManager.createComputeBindGroup();
+    sceneManager.createSpringPipeline();
 
     animate();
   });

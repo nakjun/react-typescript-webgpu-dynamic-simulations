@@ -1,7 +1,7 @@
 import { mat4, vec3 } from 'gl-matrix';
 import { Camera } from './WebGPU/Camera';
-import { Shader } from './ParticleSystem/Shader';
-import { Model } from './Cube/Model';
+import { Shader } from './[01].ParticleSystem/Shader';
+import { Model } from './[00].Cube/Model';
 
 export class RendererOrigin {
 
@@ -11,10 +11,11 @@ export class RendererOrigin {
     format!: GPUTextureFormat;
     depthTexture!: GPUTexture;
     pipeline!: GPURenderPipeline;
+    mvpUniformBuffer!: GPUBuffer;
 
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(1.0, 5.0, 10.0);
+    camera_position: vec3 = vec3.fromValues(0.0, 15.0, 80.0);
     camera_target: vec3 = vec3.fromValues(0.0, 0.0, 0.0);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
@@ -32,7 +33,7 @@ export class RendererOrigin {
             Math.PI / 4, // fov in radians
             this.canvas.width / this.canvas.height, // aspect ratio
             0.1, // near
-            100 // far
+            10000 // far
         );
         console.log("Renderer initialized");
         this.fpsDisplay = document.getElementById('fpsDisplay');
@@ -60,5 +61,38 @@ export class RendererOrigin {
             format: 'depth32float',
             usage: GPUTextureUsage.RENDER_ATTACHMENT
         });
+    }
+
+    setCamera(camera: Camera) {
+        // Projection matrix: Perspective projection
+        const projection = mat4.create();
+        mat4.perspective(projection, camera.fov, this.canvas.width / this.canvas.height, camera.near, camera.far);
+    
+        // View matrix: Camera's position and orientation in the world
+        const view = mat4.create();
+        mat4.lookAt(view, camera.position, camera.target, camera.up);
+    
+        // Model matrix: For now, we can use an identity matrix if we're not transforming the particles
+        const model = mat4.create(); // No transformation to the model
+    
+        // Now, update the buffer with these matrices
+        this.updateUniformBuffer(model, view, projection);
+    }
+
+    updateUniformBuffer(model: mat4, view: mat4, projection: mat4) {
+        // Combine the matrices into a single Float32Array
+        const data = new Float32Array(48); // 16 floats per matrix, 3 matrices
+        data.set(model);
+        data.set(view, 16); // Offset by 16 floats for the view matrix
+        data.set(projection, 32); // Offset by 32 floats for the projection matrix
+    
+        // Upload the new data to the GPU
+        this.device.queue.writeBuffer(
+            this.mvpUniformBuffer,
+            0, // Start at the beginning of the buffer
+            data.buffer, // The ArrayBuffer of the Float32Array
+            0, // Start at the beginning of the data
+            data.byteLength // The amount of data to write
+        );
     }
 }
