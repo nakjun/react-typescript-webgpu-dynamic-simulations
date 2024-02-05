@@ -11,15 +11,18 @@ export class Renderer extends RendererOrigin{
     private computeBindGroup!: GPUBindGroup;
     private mvpUniformBuffer!: GPUBuffer;
     private renderBindGroup!: GPUBindGroup;
+    private numParticlesBuffer!: GPUBuffer;
     
     //shader
     private shader!: Shader;
     
     private positions!: number[];
-    private velocities!: number[];
+    private velocities!: number[];    
+    private colors!: number[];
     
     private positionBuffer!: GPUBuffer;
     private velocityBuffer!: GPUBuffer;
+    private colorBuffer!: GPUBuffer;
     numParticles:number = 0;
 
     constructor(canvasId: string) {
@@ -28,6 +31,7 @@ export class Renderer extends RendererOrigin{
         this.shader = new Shader();
         this.positions = [];
         this.velocities = [];
+        this.colors = [];
     }
     
     async init(){
@@ -83,7 +87,12 @@ export class Renderer extends RendererOrigin{
                 buffers: [{
                     arrayStride: 12, // Assuming each particle position is a vec3<f32>
                     attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
-                }],                
+                },
+                {
+                    arrayStride: 12, // Assuming each particle position is a vec3<f32>
+                    attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x3' }],
+                }
+            ],                
             },
             fragment: {
                 module: particleShaderModule,
@@ -107,16 +116,23 @@ export class Renderer extends RendererOrigin{
         this.numParticles = numParticles;
         for (let i = 0; i < numParticles; i++) {
             const position: [number, number, number] = [
-                Math.random() * 10 - 6, // Random position in range [-1, 1]
+                Math.random() * 10 - 5.0, // Random position in range [-1, 1]
                 Math.random() * 10 + 5.0,
                 Math.random() * 10 - 5.0,
                 // Math.random() * 10,
                 // 5.0,
                 // 0.0,
             ];
+            const color: [number, number, number] = [
+                Math.random() * 10.0,
+                Math.random() * 10.0,
+                Math.random() * 10.0,
+            ]
+            
             const velocity: [number, number, number] = [0.0, 0.0, 0.0]; // Initial velocity
             this.positions.push(...position);
             this.velocities.push(...velocity);
+            this.colors.push(...color);
         }
         console.log("create particle success #",numParticles);        
     }
@@ -139,6 +155,24 @@ export class Renderer extends RendererOrigin{
         });
         new Float32Array(this.velocityBuffer.getMappedRange()).set(velocityData);
         this.velocityBuffer.unmap();
+
+        const colorData = new Float32Array(this.colors);
+        this.colorBuffer = this.device.createBuffer({
+            size: colorData.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE, 
+            mappedAtCreation: true,
+        });
+        new Float32Array(this.colorBuffer.getMappedRange()).set(colorData);
+        this.colorBuffer.unmap();
+
+        const numParticlesData = new Uint32Array([this.numParticles]);
+        this.numParticlesBuffer = this.device.createBuffer({
+            size: numParticlesData.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        new Uint32Array(this.numParticlesBuffer.getMappedRange()).set(numParticlesData);
+        this.numParticlesBuffer.unmap();
     }
 
     createComputeBindGroup() {
@@ -155,6 +189,12 @@ export class Renderer extends RendererOrigin{
                     binding: 1,
                     resource: {
                         buffer: this.velocityBuffer,
+                    },
+                },
+                {
+                    binding: 2,
+                    resource: {
+                        buffer: this.numParticlesBuffer,
                     },
                 },
             ],
@@ -182,6 +222,11 @@ export class Renderer extends RendererOrigin{
                         type: 'storage',
                         minBindingSize: 0, // or specify the actual size
                     },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: { type: 'uniform', minBindingSize: 4 }, // Ensure this matches the shader's expectation
                 },
             ],
         });
@@ -221,7 +266,7 @@ export class Renderer extends RendererOrigin{
         const computePass = commandEncoder.beginComputePass();
         computePass.setPipeline(this.computePipeline);
         computePass.setBindGroup(0, this.computeBindGroup);
-        computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64.0)+1, 1, 1);
+        computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 256.0), 1, 1);
         computePass.end();
     }
     
@@ -276,6 +321,7 @@ export class Renderer extends RendererOrigin{
         const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
         passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
         passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer        
+        passEncoder.setVertexBuffer(1, this.colorBuffer); // Set the vertex buffer        
         passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
         passEncoder.draw(this.numParticles); // Draw the cube using the index count
         passEncoder.end();

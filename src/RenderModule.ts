@@ -4,7 +4,7 @@ import { Renderer } from "./WebGPU/Renderer";
 export const Initialize = async () => {    
   const sceneManager = new Renderer("gfx-main");
   sceneManager.init().then(() => {    
-    sceneManager.createParticles(100000);
+    sceneManager.createParticles(2000);
     sceneManager.createParticleBuffers();
     sceneManager.createParticlePipeline();
 

@@ -12,6 +12,7 @@
     "@types/react-dom": "^18.2.18",
     "@webgpu/types": "^0.1.40",
     "gl-matrix": "^3.4.3",
+    "mkcert": "^3.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
@@ -19,7 +20,8 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start --cors",
+    "start": "react-scripts start --cors",    
+    "starts": "set HTTPS=true&&set SSL_CRT_FILE=.cert.pem&&set SSL_KEY_FILE=key.pem&&react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
