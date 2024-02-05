@@ -26,6 +26,9 @@ export class Renderer{
     
     //camera
     private camera!: Camera;
+    camera_position:vec3 = vec3.fromValues(0.0, 3.0, 5.0);
+    camera_target:vec3 = vec3.fromValues(0.0, 0.0, 0.0);
+    camera_up:vec3 = vec3.fromValues(0.0, 1.0, 0.0);
     
     //model
     private cubeModel!: Model;
@@ -40,7 +43,7 @@ export class Renderer{
     private indexCount:number = 0;
 
     numParticles:number = 0;
-    
+
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.positions = [];
@@ -49,9 +52,9 @@ export class Renderer{
         console.log("Renderer initialized");
         this.cubeModel = new Model();
         this.camera = new Camera(
-            vec3.fromValues(0, 3, 5), // position
-            vec3.fromValues(0, 0, 0), // target
-            vec3.fromValues(0, 1, 0), // up
+            this.camera_position, // position
+            this.camera_target, // target
+            this.camera_up, // up
             Math.PI / 4, // fov in radians
             this.canvas.width / this.canvas.height, // aspect ratio
             0.1, // near
