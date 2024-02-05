@@ -1,53 +1,38 @@
 import { mat4, vec3 } from 'gl-matrix';
-import { Camera } from './Camera';
-import { Shader } from './Shader';
-import { Model } from './Model';
+import { Camera } from '../WebGPU/Camera';
+import { Shader } from '../ParticleSystem/Shader';
+import { Model } from '../Cube/Model';
 
-export class Renderer{
+export class CubeRender{
+
     private canvas!: HTMLCanvasElement;
     private device!: GPUDevice;
     private context!: GPUCanvasContext;
     private format!: GPUTextureFormat;
     private depthTexture!: GPUTexture;
-    
     private pipeline!: GPURenderPipeline;
-    private computePipeline!: GPUComputePipeline;
-    private computeBindGroup!: GPUBindGroup;
-    private mvpUniformBuffer!: GPUBuffer;
-    private renderBindGroup!: GPUBindGroup;
-    
-    
-    //axis render
-    private axisColorVertices!: Float32Array;
-    private axisVertexBuffer!: GPUBuffer;
-    
+
     //shader
     private shader!: Shader;
-    
-    //camera
-    private camera!: Camera;
-    camera_position:vec3 = vec3.fromValues(0.0, 3.0, 5.0);
-    camera_target:vec3 = vec3.fromValues(0.0, 0.0, 0.0);
-    camera_up:vec3 = vec3.fromValues(0.0, 1.0, 0.0);
-    
+
     //model
     private cubeModel!: Model;
-    private positions!: number[];
-    private velocities!: number[];
-    
-    private positionBuffer!: GPUBuffer;
-    private velocityBuffer!: GPUBuffer;
 
     private vertexBuffer!: GPUBuffer;
     private indexBuffer!: GPUBuffer;
     private indexCount:number = 0;
 
-    numParticles:number = 0;
+    private mvpUniformBuffer!: GPUBuffer;
+    private renderBindGroup!: GPUBindGroup;
+
+    //camera
+    private camera!: Camera;
+    camera_position:vec3 = vec3.fromValues(0.0, 0.0, 15.0);
+    camera_target:vec3 = vec3.fromValues(0.0, 0.0, 0.0);
+    camera_up:vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
     constructor(canvasId: string) {
-        this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
-        this.positions = [];
-        this.velocities = [];
+        this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;        
         this.shader = new Shader();
         console.log("Renderer initialized");
         this.cubeModel = new Model();
@@ -62,48 +47,7 @@ export class Renderer{
         );
     }
 
-    async init() {
-        const adapter = await navigator.gpu?.requestAdapter();
-        if (!adapter) {
-            throw new Error("Failed to get GPU adapter");
-        }
-        this.device = await adapter?.requestDevice();
-        this.context = this.canvas.getContext("webgpu") as GPUCanvasContext;
-        this.format = "bgra8unorm";
-        this.context.configure({
-            device: this.device,
-            format: this.format,
-            alphaMode: "opaque",
-        });
-        this.createDepthTexture();
-    }
-    
-    createDepthTexture() {
-        const depthTexture = this.device.createTexture({
-            size: { width: this.canvas.width, height: this.canvas.height, depthOrArrayLayers: 1 },
-            format: 'depth32float',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT
-        });
-        this.depthTexture = depthTexture;
-    }
-
-    createParticles(numParticles: number) {
-        this.numParticles = numParticles;
-        for (let i = 0; i < numParticles; i++) {
-            const position: [number, number, number] = [
-                Math.random() * 10 - 5.0, // Random position in range [-1, 1]
-                Math.random() * 10 + 5.0,
-                0.0,
-            ];
-            const velocity: [number, number, number] = [0.0, 0.0, 0.0]; // Initial velocity
-            this.positions.push(...position);
-            this.velocities.push(...velocity);
-
-            console.log(position, velocity);
-        }
-    }
-
-    createBuffers() {
+    createBuffers() {                
         // Create vertex buffer
         this.vertexBuffer = this.device.createBuffer({
             size: this.cubeModel.get_cubeVertices().byteLength,
@@ -112,7 +56,7 @@ export class Renderer{
         });
         new Float32Array(this.vertexBuffer.getMappedRange()).set(this.cubeModel.get_cubeVertices());
         this.vertexBuffer.unmap();
-
+    
         // Create index buffer
         this.indexBuffer = this.device.createBuffer({
             size: this.cubeModel.get_cubeIndices().byteLength,
@@ -121,11 +65,11 @@ export class Renderer{
         });
         new Uint16Array(this.indexBuffer.getMappedRange()).set(this.cubeModel.get_cubeIndices());
         this.indexBuffer.unmap();
-
+    
         // Set the count of indices
         this.indexCount = this.cubeModel.get_cubeIndices().length;
     }
-
+    
     createPipeline(){
         // Load the shader code for rendering, presumably from a Shader class instance
         // This shader code likely contains both the vertex and fragment shaders.
@@ -217,68 +161,5 @@ export class Renderer{
         });
     }    
 
-    setCamera(camera: Camera) {
-        // Projection matrix: Perspective projection
-        const projection = mat4.create();
-        mat4.perspective(projection, camera.fov, this.canvas.width / this.canvas.height, camera.near, camera.far);
-    
-        // View matrix: Camera's position and orientation in the world
-        const view = mat4.create();
-        mat4.lookAt(view, camera.position, camera.target, camera.up);
-    
-        // Model matrix: For now, we can use an identity matrix if we're not transforming the particles
-        const model = mat4.create(); // No transformation to the model
-    
-        // Now, update the buffer with these matrices
-        this.updateUniformBuffer(model, view, projection);
-    }
-
-    updateUniformBuffer(model: mat4, view: mat4, projection: mat4) {
-        // Combine the matrices into a single Float32Array
-        const data = new Float32Array(48); // 16 floats per matrix, 3 matrices
-        data.set(model);
-        data.set(view, 16); // Offset by 16 floats for the view matrix
-        data.set(projection, 32); // Offset by 32 floats for the projection matrix
-    
-        // Upload the new data to the GPU
-        this.device.queue.writeBuffer(
-            this.mvpUniformBuffer,
-            0, // Start at the beginning of the buffer
-            data.buffer, // The ArrayBuffer of the Float32Array
-            0, // Start at the beginning of the data
-            data.byteLength // The amount of data to write
-        );
-    }
-    async render() {
-        const commandEncoder = this.device.createCommandEncoder();
-        const renderPassDescriptor: GPURenderPassDescriptor = {
-            colorAttachments: [{
-                view: this.context.getCurrentTexture().createView(),
-                clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }, // Background color
-                loadOp: 'clear',
-                storeOp: 'store',
-            }],
-            depthStencilAttachment: { // Add this attachment for depth testing
-                view: this.depthTexture.createView(),
-                depthClearValue: 1.0,
-                depthLoadOp: 'clear',
-                depthStoreOp: 'store',
-            }
-        };
-    
-        // Set camera and model transformations here
-        // Assuming setCamera() updates the uniform buffer with the MVP matrix
-        this.setCamera(this.camera);
-    
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-        passEncoder.setPipeline(this.pipeline); // Your render pipeline
-        passEncoder.setVertexBuffer(0, this.vertexBuffer); // Set the vertex buffer
-        passEncoder.setIndexBuffer(this.indexBuffer, 'uint16'); // Set the index buffer
-        passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
-        passEncoder.drawIndexed(this.indexCount); // Draw the cube using the index count
-        passEncoder.end();
-    
-        this.device.queue.submit([commandEncoder.finish()]);
-    }
-    
 }
+

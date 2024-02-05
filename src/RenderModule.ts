@@ -1,11 +1,16 @@
-import { Renderer } from "./Renderer";
+import { Renderer } from "./WebGPU/Renderer";
 
 
 export const Initialize = async () => {    
   const sceneManager = new Renderer("gfx-main");
   sceneManager.init().then(() => {    
-    sceneManager.createBuffers();
-    sceneManager.createPipeline();   
+    sceneManager.createParticles(25000);
+    sceneManager.createParticleBuffers();
+    sceneManager.createParticlePipeline();
+
+    sceneManager.createComputePipeline();
+    sceneManager.createComputeBindGroup();
+
     animate();
   });
 

@@ -33,6 +33,10 @@ export class Model {
         -1.0, 1.0, -1.0, 0.25, 0.25, 0.25,
     ]);
 
+    cubeColors = new Float32Array([
+        
+    ])
+
     cubeIndices = new Uint16Array([ 
         // Front
         0, 1, 2, 0, 2, 3,
