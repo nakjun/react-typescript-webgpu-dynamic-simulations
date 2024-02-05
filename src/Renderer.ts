@@ -8,6 +8,7 @@ export class Renderer{
     private device!: GPUDevice;
     private context!: GPUCanvasContext;
     private format!: GPUTextureFormat;
+    private depthTexture!: GPUTexture;
     
     private pipeline!: GPURenderPipeline;
     private computePipeline!: GPUComputePipeline;
@@ -17,7 +18,7 @@ export class Renderer{
     
     
     //axis render
-    private axisVertices!: number[];
+    private axisColorVertices!: Float32Array;
     private axisVertexBuffer!: GPUBuffer;
     
     //shader
@@ -44,7 +45,6 @@ export class Renderer{
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.positions = [];
         this.velocities = [];
-        this.axisVertices = [];        
         this.shader = new Shader();
         console.log("Renderer initialized");
         this.cubeModel = new Model();
@@ -72,6 +72,16 @@ export class Renderer{
             format: this.format,
             alphaMode: "opaque",
         });
+        this.createDepthTexture();
+    }
+    
+    createDepthTexture() {
+        const depthTexture = this.device.createTexture({
+            size: { width: this.canvas.width, height: this.canvas.height, depthOrArrayLayers: 1 },
+            format: 'depth32float',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT
+        });
+        this.depthTexture = depthTexture;
     }
 
     createParticles(numParticles: number) {
@@ -173,12 +183,18 @@ export class Renderer{
                 module: shaderModule, // The shader module for the vertex shader
                 entryPoint: "vs_main", // The entry point function in the shader code
                 buffers: [{ // Define the layout of the vertex data
-                    arrayStride: 12, // Each vertex consists of 3 floats (x, y, z), each float is 4 bytes
+                    arrayStride: 24, // Each vertex consists of 3 floats (x, y, z), each float is 4 bytes
                     attributes: [{ // Describe the attributes of the vertex data
                         shaderLocation: 0, // Corresponds to the location in the vertex shader
                         offset: 0, // The offset within the buffer (start at the beginning)
                         format: "float32x3" // The format of the vertex data (3-component vector of 32-bit floats)
+                    },
+                    { // Describe the attributes of the vertex data
+                        shaderLocation: 1, // Corresponds to the location in the vertex shader
+                        offset: 12, // The offset within the buffer (start at the beginning)
+                        format: "float32x3" // The format of the vertex data (3-component vector of 32-bit floats)
                     }]
+                    
                 }]
             },
             fragment: {
@@ -188,7 +204,13 @@ export class Renderer{
             },
             primitive: {
                 topology: "triangle-list", // The type of primitive to render. "point-list" means each vertex is a separate point.
+            },
+            depthStencil: { // This part needs to be added or corrected
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+                format: 'depth32float', // Make sure this matches the depth texture's format
             }
+    
         });
     }    
 
@@ -233,6 +255,12 @@ export class Renderer{
                 loadOp: 'clear',
                 storeOp: 'store',
             }],
+            depthStencilAttachment: { // Add this attachment for depth testing
+                view: this.depthTexture.createView(),
+                depthClearValue: 1.0,
+                depthLoadOp: 'clear',
+                depthStoreOp: 'store',
+            }
         };
     
         // Set camera and model transformations here
