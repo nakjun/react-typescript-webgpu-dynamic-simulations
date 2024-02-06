@@ -5,7 +5,7 @@ import { ClothRenderer } from "./[02].ClothSystem/Renderer";
 export const Initialize = async () => {    
   const sceneManager = new ClothRenderer("gfx-main");
   sceneManager.init().then(() => {    
-    sceneManager.createClothModel(64, 64, 1000, 0.01);
+    sceneManager.createClothModel(16, 16, 1000, 0.01);
     sceneManager.createClothBuffers();
     sceneManager.createParticlePipeline();
     sceneManager.createSpringPipeline();
