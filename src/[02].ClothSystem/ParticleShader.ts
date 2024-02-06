@@ -123,7 +123,8 @@ export class ParticleShader {
     
     @group(0) @binding(0) var<storage, read_write> positions: array<f32>;
     @group(0) @binding(1) var<storage, read_write> velocities: array<f32>;    
-    @group(0) @binding(2) var<storage, read_write> fixed: array<u32>;    
+    @group(0) @binding(2) var<storage, read_write> fixed: array<u32>;
+    @group(0) @binding(3) var<storage, read_write> force: array<f32>;   
 
     fn getPosition(index:u32) -> vec3<f32>{
         return vec3<f32>(positions[index*3],positions[index*3+1],positions[index*3+2]);
@@ -133,6 +134,10 @@ export class ParticleShader {
         return vec3<f32>(velocities[index*3],velocities[index*3+1],velocities[index*3+2]);
     }
 
+    fn getForce(index:u32) -> vec3<f32>{
+        return vec3<f32>(force[index*3],force[index*3+1],force[index*3+2]);
+    }
+
     @compute 
     @workgroup_size(256)
     fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -140,6 +145,7 @@ export class ParticleShader {
 
         var pos = getPosition(index);
         var vel = getVelocity(index);
+        var f = getForce(index);
         var fixed = fixed[index];
         
         if(fixed==1){
@@ -148,13 +154,13 @@ export class ParticleShader {
 
         let gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);
         var deltaTime: f32 = 0.01; // Assuming 60 FPS for simplicity
-        
-        if(pos.y < 0.0) {
-            pos.y = 0.01;
-            vel.y *= -0.45;
-        }
 
-        vel += (gravity * deltaTime);
+        // if(pos.y < 0.0) {
+        //     pos.y = 0.01;
+        //     vel.y *= -0.45;
+        // }
+
+        vel += ((f + gravity) * deltaTime);
         pos += (vel * deltaTime);
 
         velocities[index*3 + 0] = vel.x;
