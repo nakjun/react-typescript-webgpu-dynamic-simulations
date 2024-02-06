@@ -1,5 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix';
-import { Camera } from '../WebGPU/Camera';
+import { vec3 } from 'gl-matrix';
 import { ParticleShader } from './ParticleShader';
 import { SpringShader } from './SpringShader';
 import { RendererOrigin } from '../RendererOrigin';
@@ -10,6 +9,8 @@ class Node {
     acceleration!: vec3;
 
     fixed: boolean = false;
+
+    springs: Spring[] = [];
 
     constructor(pos: vec3, vel: vec3) {
         this.position = pos;
@@ -90,6 +91,9 @@ export class ClothRenderer extends RendererOrigin {
     xSize: number = 30.0;
     ySize: number = 30.0;
 
+    //for temp storage buffer
+    maxSpringConnected:number = 0;
+
     constructor(canvasId: string) {
         super(canvasId);
         this.particleShader = new ParticleShader();
@@ -142,7 +146,7 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < this.M; i++) {
             for (let j = 0; j < this.N-1; j++) {
                 if(i>0 && j===0) index++;
-                const spring = new Spring(
+                const sp = new Spring(
                     this.particles[index],
                     this.particles[index + 1],
                     this.kS,
@@ -151,7 +155,9 @@ export class ClothRenderer extends RendererOrigin {
                     index,
                     index + 1
                 );
-                this.springs.push(spring);
+                this.springs.push(sp);
+                this.particles[index].springs.push(sp);
+                this.particles[index + 1].springs.push(sp);
                 index++;
             }
         }
@@ -169,6 +175,8 @@ export class ClothRenderer extends RendererOrigin {
                     this.N * i + j + this.N
                 );
                 this.springs.push(sp);
+                this.particles[this.N * i + j].springs.push(sp);
+                this.particles[this.N * i + j + this.N].springs.push(sp);
             }
         }
         // 3. Shear 좌상우하
@@ -188,6 +196,8 @@ export class ClothRenderer extends RendererOrigin {
                 index + this.N + 1
             );
             this.springs.push(sp);
+            this.particles[index].springs.push(sp);
+                this.particles[index + this.N + 1].springs.push(sp);
             index++;
         }
         // 4. Shear 우상좌하
@@ -207,6 +217,8 @@ export class ClothRenderer extends RendererOrigin {
                 index + this.N - 1
             );
             this.springs.push(sp);
+            this.particles[index].springs.push(sp);
+            this.particles[index + this.N - 1].springs.push(sp);
             index++;
         }
         // 5. Bending 가로
@@ -226,6 +238,8 @@ export class ClothRenderer extends RendererOrigin {
                 index + 2
             );
             this.springs.push(sp);
+            this.particles[index].springs.push(sp);
+            this.particles[index + 2].springs.push(sp);
             index++;
         }
         // //6. Bending 세로
@@ -241,8 +255,16 @@ export class ClothRenderer extends RendererOrigin {
                     i + (j + 3) * this.M
                 );
                 this.springs.push(sp);
+                this.particles[i + (j * this.M)].springs.push(sp);
+                this.particles[i + (j + 3) * this.M].springs.push(sp);
             }
         }
+
+        for(let i=0;i<this.particles.length;i++){
+            let nConnectedSpring = this.particles[i].springs.length;
+            this.maxSpringConnected = Math.max(this.maxSpringConnected, nConnectedSpring);
+        }
+        console.log("maxSpringConnected : #",this.maxSpringConnected);
     }
 
     createClothBuffers() {
