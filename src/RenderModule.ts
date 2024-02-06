@@ -3,15 +3,28 @@ import { ClothRenderer } from "./[02].ClothSystem/Renderer";
 
 
 export const Initialize = async () => {    
-  const sceneManager = new ClothRenderer("gfx-main");
+  const sceneManager = new Renderer("gfx-main");
   sceneManager.init().then(() => {    
-    sceneManager.createClothModel(16, 16, 1000, 0.01);
-    sceneManager.createClothBuffers();
+    sceneManager.createParticles(1000);
+    sceneManager.createParticleBuffers();
     sceneManager.createParticlePipeline();
-    sceneManager.createSpringPipeline();
-
+    sceneManager.createComputePipeline();
+    sceneManager.createComputeBindGroup();
     animate();
   });
+
+
+  // const sceneManager = new ClothRenderer("gfx-main");
+  // sceneManager.init().then(() => {    
+  //   sceneManager.createClothModel(4, 4, 1000, 0.01);
+  //   sceneManager.createClothBuffers();
+  //   sceneManager.createRenderPipeline();
+  //   sceneManager.createSpringPipeline();
+  //   sceneManager.createParticlePipeline();
+  //   sceneManager.createClothComputePipeline();
+    
+  //   animate();
+  // });
 
   // Create an animation loop function
   function animate() {

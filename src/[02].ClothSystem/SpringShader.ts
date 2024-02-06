@@ -3,15 +3,15 @@ export class SpringShader{
     springUpdateShader = `
     @group(0) @binding(0) var<storage, read_write> positions: array<vec3<f32>>;
     @group(0) @binding(1) var<storage, read_write> velocities: array<vec3<f32>>;
-    @group(0) @binding(2) var<storage, read> springs: array<SpringData>; // Define SpringData appropriately
+    @group(0) @binding(2) var<storage, read> springs: array<Spring>; // Define SpringData appropriately
     @group(0) @binding(3) var<uniform> numSprings: u32;
 
-    struct SpringData {
-        index1: u32;
-        index2: u32;
-        restLength: f32;
-        ks: f32;
-        kd: f32;
+    struct Spring {
+        index1: u32,
+        index2: u32,
+        ks: f32,
+        kd: f32,
+        mRestLen: f32
     };
 
     @compute @workgroup_size(64)
@@ -29,11 +29,8 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 
         let len = length(posDirection);
         let forceDirection = normalize(posDirection);
-        let spforce = (len - spring.restLength) * spring.ks;    
+        let spforce = (len - spring.mRestLen) * spring.ks;    
         let damp = dot(velDirection, forceDirection) * spring.kd / len;    
-
-        // Update velocities based on calculated force
-        // This part needs to be adapted based on your simulation specifics
     }
 }
     `;

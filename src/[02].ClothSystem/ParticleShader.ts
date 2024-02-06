@@ -74,23 +74,16 @@ export class ParticleShader {
     freefallComputeShader = `
     
     @group(0) @binding(0) var<storage, read_write> positions: array<vec3<f32>>;
-    @group(0) @binding(1) var<storage, read_write> velocities: array<vec3<f32>>;
-    @group(0) @binding(2) var<uniform> numParticles: i32;
+    @group(0) @binding(1) var<storage, read_write> velocities: array<vec3<f32>>;    
     
-    // Simple collision response that inverts velocity upon collision
-    fn respondToCollision(velocity: vec3<f32>) -> vec3<f32> {
-        // Invert velocity for simplicity; replace with your collision response
-        return -velocity;
-    }
-
-    @compute @workgroup_size(256)
+    @compute @workgroup_size(64)
     fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let index: u32 = global_id.x;
         var pos = positions[index];
         var vel = velocities[index];
 
         let gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);
-        var deltaTime: f32 = 0.002; // Assuming 60 FPS for simplicity
+        var deltaTime: f32 = 0.01; // Assuming 60 FPS for simplicity
         
         if(pos.y < 0.0) {
             pos.y = 0.01;

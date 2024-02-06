@@ -28,7 +28,10 @@ class Spring {
     kD: number = 0.01;
     type: string = "spring type";
 
-    constructor(_n1: Node, _n2: Node, ks: number, kd: number, type: string) {
+    index1: number = 0;
+    index2: number = 0;
+
+    constructor(_n1: Node, _n2: Node, ks: number, kd: number, type: string, _i1: number, _i2: number) {
         this.n1 = _n1;
         this.n2 = _n2;
 
@@ -37,6 +40,9 @@ class Spring {
         this.type = type;
 
         this.mRestLen = vec3.distance(this.n1.position, this.n2.position);
+
+        this.index1 = _i1;
+        this.index2 = _i2;
     }
 }
 
@@ -44,15 +50,20 @@ export class ClothRenderer extends RendererOrigin {
 
     private particlePipeline!: GPURenderPipeline;
     private springPipeline!: GPURenderPipeline;
+    private renderBindGroup!: GPUBindGroup;
 
     private computePipeline!: GPUComputePipeline;
     private computeBindGroup!: GPUBindGroup;
-    private renderBindGroup!: GPUBindGroup;
+    private computeSpringPipeline!: GPUComputePipeline;
+    private computeSpringBindGroup!: GPUBindGroup;
+
     private numParticlesBuffer!: GPUBuffer;
+    private numSpringsBuffer!: GPUBuffer;
 
     private positionBuffer!: GPUBuffer;
     private velocityBuffer!: GPUBuffer;
-    private springBuffer!: GPUBuffer;
+    private springRenderBuffer!: GPUBuffer;
+    private springCalculationBuffer!: GPUBuffer;
 
     //shader
     private particleShader!: ParticleShader;
@@ -64,14 +75,16 @@ export class ClothRenderer extends RendererOrigin {
 
     numParticles: number = 0;
 
+    renderPassDescriptor!: GPURenderPassDescriptor;
+
     //cloth information
     N: number = 0;
     M: number = 0;
     kS: number = 0;
     kD: number = 0;
 
-    xSize:number = 30.0;
-    ySize:number = 30.0;
+    xSize: number = 30.0;
+    ySize: number = 30.0;
 
     constructor(canvasId: string) {
         super(canvasId);
@@ -80,17 +93,16 @@ export class ClothRenderer extends RendererOrigin {
     }
 
     async init() {
-        await super.init();
-        
+        await super.init();        
     }
 
-    createClothModel(x:number, y:number, ks:number, kd:number){
-        
+    createClothModel(x: number, y: number, ks: number, kd: number) {
+
         this.N = x;
         this.M = y;
         this.kS = ks;
         this.kD = kd;
-        
+
         this.createParticles();
         this.createSprings();
     }
@@ -111,8 +123,6 @@ export class ClothRenderer extends RendererOrigin {
                 const n = new Node(pos, vel);
 
                 this.particles.push(n);
-
-                console.log(pos);
             }
         }
         console.log("create node success");
@@ -120,13 +130,15 @@ export class ClothRenderer extends RendererOrigin {
     createSprings() {
         let index = 0;
         for (let i = 0; i < this.N - 1; i++) {
-            for (let j = 0; j < this.M; j++) {                
+            for (let j = 0; j < this.M; j++) {
                 const spring = new Spring(
                     this.particles[index],
                     this.particles[index + 1],
                     this.kS,
                     this.kD,
-                    "structural"
+                    "structural",
+                    index,
+                    index + 1
                 );
                 this.springs.push(spring);
             }
@@ -135,7 +147,15 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < (this.M - 1); i++) {
             for (let j = 0; j < this.N; j++) {
                 ++index;
-                let sp = new Spring(this.particles[this.N * i + j], this.particles[this.N * i + j + this.N], this.kS, this.kD, "structural");
+                const sp = new Spring(
+                    this.particles[this.N * i + j], 
+                    this.particles[this.N * i + j + this.N], 
+                    this.kS, 
+                    this.kD, 
+                    "structural", 
+                    this.N * i + j, 
+                    this.N * i + j + this.N
+                );
                 this.springs.push(sp);
             }
         }
@@ -146,7 +166,15 @@ export class ClothRenderer extends RendererOrigin {
                 index++;
                 continue;
             }
-            let sp = new Spring(this.particles[index], this.particles[index + this.N + 1], this.kS, this.kD, "shear");
+            const sp = new Spring(
+                this.particles[index], 
+                this.particles[index + this.N + 1], 
+                this.kS, 
+                this.kD, 
+                "shear",
+                index,
+                index + this.N + 1
+            );
             this.springs.push(sp);
             index++;
         }
@@ -157,7 +185,15 @@ export class ClothRenderer extends RendererOrigin {
                 index++;
                 continue;
             }
-            let sp = new Spring(this.particles[index], this.particles[index + this.N - 1], this.kS, this.kD, "shear");
+            const sp = new Spring(
+                this.particles[index], 
+                this.particles[index + this.N - 1], 
+                this.kS, 
+                this.kD, 
+                "shear",
+                index,
+                index + this.N - 1
+            );
             this.springs.push(sp);
             index++;
         }
@@ -168,21 +204,36 @@ export class ClothRenderer extends RendererOrigin {
                 index++;
                 continue;
             }
-            let sp = new Spring(this.particles[index], this.particles[index + 2], this.kS, this.kD, "bending");
+            const sp = new Spring(
+                this.particles[index], 
+                this.particles[index + 2], 
+                this.kS, 
+                this.kD, 
+                "bending",
+                index,
+                index + 2
+            );
             this.springs.push(sp);
             index++;
         }
         //6. Bending 세로
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M - 3; j++) {
-                let sp = new Spring(this.particles[i + (j * this.M)], this.particles[i + (j + 3) * this.M], this.kS, this.kD, "bending");
-                this.springs.push(sp);                
+                const sp = new Spring(
+                    this.particles[i + (j * this.M)], 
+                    this.particles[i + (j + 3) * this.M], 
+                    this.kS, 
+                    this.kD, 
+                    "bending",
+                    i + (j * this.M),
+                    i + (j + 3) * this.M
+                );
+                this.springs.push(sp);
             }
         }
     }
 
-    createClothBuffers()
-    {
+    createClothBuffers() {
         const positionData = new Float32Array(this.particles.flatMap(p => [p.position[0], p.position[1], p.position[2]]));
         const velocityData = new Float32Array(this.particles.flatMap(p => [p.velocity[0], p.velocity[1], p.velocity[2]]));
 
@@ -193,32 +244,148 @@ export class ClothRenderer extends RendererOrigin {
         });
         new Float32Array(this.positionBuffer.getMappedRange()).set(positionData);
         this.positionBuffer.unmap();
-    
+
         this.velocityBuffer = this.device.createBuffer({
             size: velocityData.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true,
         });
         new Float32Array(this.velocityBuffer.getMappedRange()).set(velocityData);
-        this.velocityBuffer.unmap();    
+        this.velocityBuffer.unmap();
 
         const springData = new Float32Array(this.springs.flatMap(s => [
             ...s.n1.position, // Start position of the spring
             ...s.n2.position  // End position of the spring
         ]));
-    
-        this.springBuffer = this.device.createBuffer({
+
+        this.springRenderBuffer = this.device.createBuffer({
             size: springData.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true,
         });
-        new Float32Array(this.springBuffer.getMappedRange()).set(springData);
-        this.springBuffer.unmap();
+        new Float32Array(this.springRenderBuffer.getMappedRange()).set(springData);
+        this.springRenderBuffer.unmap();
+
+        const springCalcData = new Float32Array(this.springs.length * 5); // 5 elements per spring
+        this.springs.forEach((spring, i) => {
+            let offset = i * 5;
+            springCalcData[offset] = spring.index1;
+            springCalcData[offset + 1] = spring.index2;
+            springCalcData[offset + 2] = spring.kS;
+            springCalcData[offset + 3] = spring.kD;
+            springCalcData[offset + 4] = spring.mRestLen;
+        });
+
+        // Create the GPU buffer for springs
+        this.springCalculationBuffer = this.device.createBuffer({
+            size: springCalcData.byteLength,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        new Float32Array(this.springCalculationBuffer.getMappedRange()).set(springCalcData);
+        this.springCalculationBuffer.unmap();
+
+        const numParticlesData = new Uint32Array([this.numParticles]);
+        this.numParticlesBuffer = this.device.createBuffer({
+            size: numParticlesData.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        new Uint32Array(this.numParticlesBuffer.getMappedRange()).set(numParticlesData);
+        this.numParticlesBuffer.unmap();
     }
 
-    createParticlePipeline() {
-        const particleShaderModule = this.device.createShaderModule({ code: this.particleShader.getParticleShader() });
+    createClothComputePipeline(){
         
+        const springComputeShaderModule = this.device.createShaderModule({ code: this.springShader.getSpringUpdateShader() });
+        
+        const bindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: {
+                        type: 'storage',
+                        minBindingSize: 0, // or specify the actual size
+                    },
+                },
+                {
+                    binding: 1, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: {
+                        type: 'storage',
+                        minBindingSize: 0, // or specify the actual size
+                    },
+                },
+                {
+                    binding: 2, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: {
+                        type: 'read-only-storage',
+                        minBindingSize: 0, // or specify the actual size
+                    },
+                },
+                {
+                    binding: 3, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: { type: 'uniform', minBindingSize: 4 }, // Ensure this matches the shader's expectation
+                }
+            ]
+        });
+        
+        const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+    
+        this.computeSpringPipeline = this.device.createComputePipeline({
+            layout: computePipelineLayout, // Use the created pipeline layout
+            compute: {
+                module: springComputeShaderModule,
+                entryPoint: 'main',
+            },
+        });
+
+        const numSpringsData = new Uint32Array([this.springs.length]);
+        this.numSpringsBuffer = this.device.createBuffer({
+            size: numSpringsData.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        new Uint32Array(this.numSpringsBuffer.getMappedRange()).set(numSpringsData);
+        this.numSpringsBuffer.unmap();
+
+        this.computeSpringBindGroup = this.device.createBindGroup({
+            layout: bindGroupLayout, // The layout created earlier
+            entries: [
+                {
+                    binding: 0, // Corresponds to the binding in the layout
+                    resource: {
+                        buffer: this.positionBuffer // The buffer to bind
+                    }
+                },
+                {
+                    binding: 1, // Corresponds to the binding in the layout
+                    resource: {
+                        buffer: this.velocityBuffer // The buffer to bind
+                    }
+                },
+                {
+                    binding: 2, // Corresponds to the binding in the layout
+                    resource: {
+                        buffer: this.springCalculationBuffer // The buffer to bind
+                    }
+                },
+                {
+                    binding: 3, // Corresponds to the binding in the layout
+                    resource: {
+                        buffer: this.numSpringsBuffer // The buffer to bind
+                    }
+                }
+            ]
+        });
+    }
+
+    createRenderPipeline() {
+        const particleShaderModule = this.device.createShaderModule({ code: this.particleShader.getParticleShader() });
+
         const bindGroupLayout = this.device.createBindGroupLayout({
             entries: [
                 {
@@ -228,7 +395,7 @@ export class ClothRenderer extends RendererOrigin {
                 }
             ]
         });
-    
+
         // Create a uniform buffer for the MVP matrix. The size is 64 bytes * 3, assuming
         // you're storing three 4x4 matrices (model, view, projection) as 32-bit floats.
         // This buffer will be updated with the MVP matrix before each render.
@@ -236,7 +403,7 @@ export class ClothRenderer extends RendererOrigin {
             size: 64 * 3, // The total size needed for the matrices
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST // The buffer is used as a uniform and can be copied to
         });
-        
+
         // Create a bind group that binds the previously created uniform buffer to the shader.
         // This allows your shader to access the buffer as defined in the bind group layout.
         this.renderBindGroup = this.device.createBindGroup({
@@ -250,7 +417,7 @@ export class ClothRenderer extends RendererOrigin {
                 }
             ]
         });
-    
+
         // Create a pipeline layout that includes the bind group layouts.
         // This layout is necessary for the render pipeline to know how resources are structured.
         const pipelineLayout = this.device.createPipelineLayout({
@@ -266,7 +433,7 @@ export class ClothRenderer extends RendererOrigin {
                     arrayStride: 12, // Assuming each particle position is a vec3<f32>
                     attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
                 }
-            ],                
+                ],
             },
             fragment: {
                 module: particleShaderModule,
@@ -283,15 +450,15 @@ export class ClothRenderer extends RendererOrigin {
                 format: 'depth32float',
             },
         });
-        console.log("create particle pipeline success");
+        console.log("create render pipeline success");
     }
 
     createSpringPipeline() {
         const springShaderModule = this.device.createShaderModule({ code: this.particleShader.getSpringShader() });
-    
+
         // Assuming bindGroupLayout and pipelineLayout are similar to createParticlePipeline
         // You may reuse the same layout if it fits your needs
-    
+
         const bindGroupLayout = this.device.createBindGroupLayout({
             entries: [
                 {
@@ -334,11 +501,98 @@ export class ClothRenderer extends RendererOrigin {
         });
     }
 
-    async render() {        
-        const currentTime = performance.now();
-        this.frameCount++;
+    createParticlePipeline(){
+        const computeShaderModule = this.device.createShaderModule({ code: this.particleShader.getComputeShader() });
+    
+        // Create bind group layout for storage buffers
+        const bindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0, // matches @group(0) @binding(0)
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: 'storage',
+                        minBindingSize: 0, // or specify the actual size
+                    },
+                },
+                {
+                    binding: 1, // matches @group(0) @binding(1)
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: 'storage',
+                        minBindingSize: 0, // or specify the actual size
+                    },
+                }
+            ],
+        });
+    
+        // Use the bind group layout to create a pipeline layout
+        const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+    
+        const computePipeline = this.device.createComputePipeline({
+            layout: computePipelineLayout, // Use the created pipeline layout
+            compute: {
+                module: computeShaderModule,
+                entryPoint: 'main',
+            },
+        });
+    
+        this.computePipeline = computePipeline;
 
-        const renderPassDescriptor: GPURenderPassDescriptor = {
+        this.computeBindGroup = this.device.createBindGroup({
+            layout: this.computePipeline.getBindGroupLayout(0),
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: this.positionBuffer,
+                    },
+                },
+                {
+                    binding: 1,
+                    resource: {
+                        buffer: this.velocityBuffer,
+                    },
+                }
+            ],
+        });
+    }
+
+    //Compute Shader
+    updateSprings(commandEncoder:GPUCommandEncoder){
+        this.setCamera(this.camera);
+        const computePass = commandEncoder.beginComputePass();
+        computePass.setPipeline(this.computeSpringPipeline);
+        computePass.setBindGroup(0, this.computeSpringBindGroup);
+        computePass.dispatchWorkgroups(Math.ceil(this.springs.length / 64.0)+1, 1, 1);
+        computePass.end();
+    }
+    updateParticles(commandEncoder:GPUCommandEncoder) {
+        this.setCamera(this.camera);
+        const computePass = commandEncoder.beginComputePass();
+        computePass.setPipeline(this.computePipeline);
+        computePass.setBindGroup(0, this.computeBindGroup);
+        computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64.0)+1, 1, 1);
+        computePass.end();
+    }    
+    renderCloth(commandEncoder:GPUCommandEncoder){
+        this.setCamera(this.camera);
+        const passEncoder = commandEncoder.beginRenderPass(this.renderPassDescriptor);
+        passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
+        passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer                
+        passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
+        passEncoder.draw(this.N * this.M); // Draw the cube using the index count
+
+        // passEncoder.setPipeline(this.springPipeline);
+        // passEncoder.setVertexBuffer(0, this.springRenderBuffer);
+        // passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
+        // passEncoder.draw(this.springs.length * 2);
+
+        passEncoder.end();
+    }
+
+    makeRenderpassDescriptor(){
+        this.renderPassDescriptor = {
             colorAttachments: [{
                 view: this.context.getCurrentTexture().createView(),
                 clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }, // Background color
@@ -352,37 +606,37 @@ export class ClothRenderer extends RendererOrigin {
                 depthStoreOp: 'store',
             }
         };
-    
-        // Set camera and model transformations here
-        // Assuming setCamera() updates the uniform buffer with the MVP matrix
-        this.setCamera(this.camera);    
-        const commandEncoder = this.device.createCommandEncoder();
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-        passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
-        passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer                
-        passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
-        passEncoder.draw(this.N * this.M); // Draw the cube using the index count
-        
-        passEncoder.setPipeline(this.springPipeline);
-        passEncoder.setVertexBuffer(0, this.springBuffer);
-        passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
-        passEncoder.draw(this.springs.length * 2);
-        
-        passEncoder.end();
+    }
 
+    async render() {
+        const currentTime = performance.now();
+        this.frameCount++;
+
+        this.makeRenderpassDescriptor();
+
+        
+        const commandEncoder = this.device.createCommandEncoder();
+        
+        //compute pass
+        this.updateSprings(commandEncoder);
+        this.updateParticles(commandEncoder);
+
+        //render pass
+        this.renderCloth(commandEncoder);
+        
         this.device.queue.submit([commandEncoder.finish()]);
 
         if (currentTime - this.lastTime >= 1000) {
             // Calculate the FPS.
             const fps = this.frameCount;
-    
+
             // Optionally, display the FPS in the browser.
             if (this.fpsDisplay) {
                 this.fpsDisplay.textContent = `FPS: ${fps}`;
             } else {
                 console.log(`FPS: ${fps}`);
             }
-    
+
             // Reset the frame count and update the last time check.
             this.frameCount = 0;
             this.lastTime = currentTime;
