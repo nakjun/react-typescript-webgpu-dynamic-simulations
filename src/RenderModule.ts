@@ -18,7 +18,7 @@ export const Initialize = async () => {
 
   const sceneManager = new ClothRenderer("gfx-main");
   sceneManager.init().then(() => {    
-    sceneManager.createClothModel(2, 2, 1000, 0.01);
+    sceneManager.createClothModel(128, 128, 700.0, 0.1);    
     sceneManager.createClothBuffers();
     sceneManager.createRenderPipeline();
     sceneManager.createSpringPipeline();

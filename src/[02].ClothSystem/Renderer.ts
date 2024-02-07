@@ -39,12 +39,11 @@ class Spring {
         this.n1 = _n1;
         this.n2 = _n2;
 
-        this.kS = ks;
-        this.kD = kd;
+        this.kS = Math.round((ks + Number.EPSILON) * 100) / 100;
+        this.kD = Math.round((kd + Number.EPSILON) * 10000) / 10000;
         this.type = type;
 
-        this.mRestLen = vec3.distance(this.n1.position, this.n2.position);
-
+        this.mRestLen = Math.round((vec3.distance(this.n1.position, this.n2.position) + Number.EPSILON) * 100) / 100;
         this.index1 = _i1;
         this.index2 = _i2;
     }
@@ -64,6 +63,9 @@ export class ClothRenderer extends RendererOrigin {
     private computeSpringRenderBindGroup!: GPUBindGroup;
     private computeNodeForcePipeline!: GPUComputePipeline;
     private computeNodeForceBindGroup!: GPUBindGroup;
+
+    private computeNodeForceInitPipeline!: GPUComputePipeline;
+    private computeNodeForceInitBindGroup!: GPUBindGroup;
 
     private numParticlesBuffer!: GPUBuffer;
     private numSpringsBuffer!: GPUBuffer;
@@ -101,6 +103,7 @@ export class ClothRenderer extends RendererOrigin {
     //for temp storage buffer
     maxSpringConnected:number = 0;
     private tempSpringForceBuffer!: GPUBuffer;
+    private mappedBuffer!: GPUBuffer;
 
     constructor(canvasId: string) {
         super(canvasId);
@@ -163,11 +166,11 @@ export class ClothRenderer extends RendererOrigin {
                     index,
                     index + 1
                 );
-                sp.targetIndex1 = this.particles[index].springs.length;
-                sp.targetIndex2 = this.particles[index + 1].springs.length;
+                sp.targetIndex1 = this.particles[sp.index1].springs.length;
+                sp.targetIndex2 = this.particles[sp.index2].springs.length;
                 this.springs.push(sp);
-                this.particles[index].springs.push(sp);
-                this.particles[index + 1].springs.push(sp);
+                this.particles[sp.index1].springs.push(sp);
+                this.particles[sp.index2].springs.push(sp);
                 index++;
             }
         }
@@ -184,11 +187,11 @@ export class ClothRenderer extends RendererOrigin {
                     this.N * i + j, 
                     this.N * i + j + this.N
                 );
-                sp.targetIndex1 = this.particles[this.N * i + j].springs.length;
-                sp.targetIndex2 = this.particles[this.N * i + j + this.N].springs.length;
-                this.springs.push(sp);                
-                this.particles[this.N * i + j].springs.push(sp);
-                this.particles[this.N * i + j + this.N].springs.push(sp);
+                sp.targetIndex1 = this.particles[sp.index1].springs.length;
+                sp.targetIndex2 = this.particles[sp.index2].springs.length;
+                this.springs.push(sp);
+                this.particles[sp.index1].springs.push(sp);
+                this.particles[sp.index2].springs.push(sp);
             }
         }
         // 3. Shear 좌상우하
@@ -207,11 +210,11 @@ export class ClothRenderer extends RendererOrigin {
                 index,
                 index + this.N + 1
             );
-            sp.targetIndex1 = this.particles[index].springs.length;
-            sp.targetIndex2 = this.particles[index + this.N + 1].springs.length;
+            sp.targetIndex1 = this.particles[sp.index1].springs.length;
+            sp.targetIndex2 = this.particles[sp.index2].springs.length;
             this.springs.push(sp);
-            this.particles[index].springs.push(sp);
-                this.particles[index + this.N + 1].springs.push(sp);
+            this.particles[sp.index1].springs.push(sp);
+            this.particles[sp.index2].springs.push(sp);
             index++;
         }
         // 4. Shear 우상좌하
@@ -230,11 +233,11 @@ export class ClothRenderer extends RendererOrigin {
                 index,
                 index + this.N - 1
             );
-            sp.targetIndex1 = this.particles[index].springs.length;
-            sp.targetIndex2 = this.particles[index + this.N - 1].springs.length;
+            sp.targetIndex1 = this.particles[sp.index1].springs.length;
+            sp.targetIndex2 = this.particles[sp.index2].springs.length;
             this.springs.push(sp);
-            this.particles[index].springs.push(sp);
-            this.particles[index + this.N - 1].springs.push(sp);
+            this.particles[sp.index1].springs.push(sp);
+            this.particles[sp.index2].springs.push(sp);
             index++;
         }
         // 5. Bending 가로
@@ -253,11 +256,11 @@ export class ClothRenderer extends RendererOrigin {
                 index,
                 index + 2
             );
-            sp.targetIndex1 = this.particles[index].springs.length;
-            sp.targetIndex2 = this.particles[index + 2].springs.length;
+            sp.targetIndex1 = this.particles[sp.index1].springs.length;
+            sp.targetIndex2 = this.particles[sp.index2].springs.length;
             this.springs.push(sp);
-            this.particles[index].springs.push(sp);
-            this.particles[index + 2].springs.push(sp);
+            this.particles[sp.index1].springs.push(sp);
+            this.particles[sp.index2].springs.push(sp);
             index++;
         }
         // //6. Bending 세로
@@ -272,11 +275,11 @@ export class ClothRenderer extends RendererOrigin {
                     i + (j * this.M),
                     i + (j + 3) * this.M
                 );
-                sp.targetIndex1 = this.particles[i + (j * this.M)].springs.length;
-                sp.targetIndex2 = this.particles[i + (j + 3) * this.M].springs.length;
+                sp.targetIndex1 = this.particles[sp.index1].springs.length;
+                sp.targetIndex2 = this.particles[sp.index2].springs.length;
                 this.springs.push(sp);
-                this.particles[i + (j * this.M)].springs.push(sp);
-                this.particles[i + (j + 3) * this.M].springs.push(sp);
+                this.particles[sp.index1].springs.push(sp);
+                this.particles[sp.index2].springs.push(sp);
             }
         }
 
@@ -285,9 +288,13 @@ export class ClothRenderer extends RendererOrigin {
             this.maxSpringConnected = Math.max(this.maxSpringConnected, nConnectedSpring);            
         }
         for(let i=0;i<this.springs.length;i++){
-            let sp = this.springs[i];
-            console.log(i, " => ", sp.index1 , " / ", this.springs[i].targetIndex1, " : ", (this.numParticles-1) * sp.index1 + this.springs[i].targetIndex1);
-            console.log(i, " => ", sp.index2 , " / ", this.springs[i].targetIndex2, " : ", (this.numParticles-1) * sp.index2 + this.springs[i].targetIndex2);            
+            var sp = this.springs[i];            
+
+            sp.targetIndex1 += (this.maxSpringConnected * sp.index1);
+            sp.targetIndex2 += (this.maxSpringConnected * sp.index2);
+
+            // console.log(i, " => ", sp.index1 , " / ", this.springs[i].targetIndex1);
+            // console.log(i, " => ", sp.index2 , " / ", this.springs[i].targetIndex2);
         }
         console.log("maxSpringConnected : #",this.maxSpringConnected);
     }
@@ -299,7 +306,7 @@ export class ClothRenderer extends RendererOrigin {
 
         this.positionBuffer = this.device.createBuffer({
             size: positionData.byteLength,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
             mappedAtCreation: true,
         });
         new Float32Array(this.positionBuffer.getMappedRange()).set(positionData);
@@ -307,13 +314,14 @@ export class ClothRenderer extends RendererOrigin {
 
         this.velocityBuffer = this.device.createBuffer({
             size: velocityData.byteLength,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
             mappedAtCreation: true,
         });
         new Float32Array(this.velocityBuffer.getMappedRange()).set(velocityData);
         this.velocityBuffer.unmap();
 
-        console.log(forceData.byteLength);
+        console.log(this.positionBuffer.size, this.velocityBuffer.size, this.positionBuffer.size);
+
         this.forceBuffer = this.device.createBuffer({
             size: forceData.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
@@ -350,7 +358,7 @@ export class ClothRenderer extends RendererOrigin {
         new Uint32Array(this.springRenderBuffer.getMappedRange()).set(this.springIndicies);
         this.springRenderBuffer.unmap();
 
-        const springCalcData = new Float32Array(this.springs.length * 7); // 5 elements per spring
+        const springCalcData = new Float32Array(this.springs.length * 7); // 7 elements per spring
         this.springs.forEach((spring, i) => {
             let offset = i * 7;
             springCalcData[offset] = spring.index1;
@@ -365,7 +373,7 @@ export class ClothRenderer extends RendererOrigin {
         // Create the GPU buffer for springs
         this.springCalculationBuffer = this.device.createBuffer({
             size: springCalcData.byteLength,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
             mappedAtCreation: true,
         });
         new Float32Array(this.springCalculationBuffer.getMappedRange()).set(springCalcData);
@@ -380,14 +388,7 @@ export class ClothRenderer extends RendererOrigin {
         new Uint32Array(this.numParticlesBuffer.getMappedRange()).set(numParticlesData);
         this.numParticlesBuffer.unmap();
 
-        const nodeSpringConnectedData = new Float32Array(this.maxSpringConnected * this.numParticles * 3);
-        for(let i=0;i<this.numParticles;i++){
-            for(let j=0;j<this.maxSpringConnected;j=j+3){
-                nodeSpringConnectedData[i * this.numParticles + j + 0] = 0.0;                
-                nodeSpringConnectedData[i * this.numParticles + j + 1] = 0.0;                
-                nodeSpringConnectedData[i * this.numParticles + j + 2] = 0.0;                
-            }
-        }
+        const nodeSpringConnectedData = new Float32Array(this.maxSpringConnected * this.numParticles * 3);                
         this.tempSpringForceBuffer = this.device.createBuffer({
             size: nodeSpringConnectedData.byteLength,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
@@ -395,6 +396,12 @@ export class ClothRenderer extends RendererOrigin {
         });
         new Float32Array(this.tempSpringForceBuffer.getMappedRange()).set(nodeSpringConnectedData);
         this.tempSpringForceBuffer.unmap();
+
+        this.mappedBuffer = this.device.createBuffer({
+            label: "mapped buffer",
+            size: nodeSpringConnectedData.byteLength,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+        });
     }
 
     createSpringForceComputePipeline(){
@@ -491,80 +498,156 @@ export class ClothRenderer extends RendererOrigin {
 
     createNodeForceSummationPipeline(){
         const nodeForceComputeShaderModule = this.device.createShaderModule({ code: this.springShader.getNodeForceShader() });
+        {
+            const bindGroupLayout = this.device.createBindGroupLayout({
+                entries: [
+                    {
+                        binding: 0, // The binding number in the shader
+                        visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                        buffer: { type: 'storage', minBindingSize: 0, },
+                    },
+                    {
+                        binding: 1, // The binding number in the shader
+                        visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                        buffer: { type: 'storage', minBindingSize: 0, },
+                    },
+                    {
+                        binding: 2, // The binding number in the shader
+                        visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                        buffer: { type: 'uniform', minBindingSize: 4 }, // Ensure this matches the shader's expectation
+                    },
+                    {
+                        binding: 3, // The binding number in the shader
+                        visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                        buffer: { type: 'uniform', minBindingSize: 4 }, // Ensure this matches the shader's expectation
+                    }
+                ]
+            });
+            
+            const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
         
-        const bindGroupLayout = this.device.createBindGroupLayout({
-            entries: [
-                {
-                    binding: 0, // The binding number in the shader
-                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
-                    buffer: { type: 'storage', minBindingSize: 0, },
+            this.computeNodeForcePipeline = this.device.createComputePipeline({
+                layout: computePipelineLayout,  
+                compute: {
+                    module: nodeForceComputeShaderModule,
+                    entryPoint: 'main',
                 },
-                {
-                    binding: 1, // The binding number in the shader
-                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
-                    buffer: { type: 'storage', minBindingSize: 0, },
-                },
-                {
-                    binding: 2, // The binding number in the shader
-                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
-                    buffer: { type: 'uniform', minBindingSize: 4 }, // Ensure this matches the shader's expectation
-                },
-                {
-                    binding: 3, // The binding number in the shader
-                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
-                    buffer: { type: 'uniform', minBindingSize: 4 }, // Ensure this matches the shader's expectation
-                }
-            ]
-        });
-        
-        const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+            });
     
-        this.computeNodeForcePipeline = this.device.createComputePipeline({
-            layout: computePipelineLayout,  
-            compute: {
-                module: nodeForceComputeShaderModule,
-                entryPoint: 'main',
-            },
-        });
-
-        const maxConnectedSpringData = new Uint32Array([this.numParticles]);
-        this.maxConnectedSpringBuffer = this.device.createBuffer({
-            size: maxConnectedSpringData.byteLength,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            mappedAtCreation: true,
-        });
-        new Uint32Array(this.maxConnectedSpringBuffer.getMappedRange()).set(maxConnectedSpringData);
-        this.maxConnectedSpringBuffer.unmap();
-
-        this.computeNodeForceBindGroup = this.device.createBindGroup({
-            layout: bindGroupLayout, // The layout created earlier
-            entries: [
-                {
-                    binding: 0,  
-                    resource: {
-                        buffer: this.tempSpringForceBuffer  
+            const maxConnectedSpringData = new Uint32Array([this.maxSpringConnected]);
+            this.maxConnectedSpringBuffer = this.device.createBuffer({
+                size: maxConnectedSpringData.byteLength,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+                mappedAtCreation: true,
+            });
+            new Uint32Array(this.maxConnectedSpringBuffer.getMappedRange()).set(maxConnectedSpringData);
+            this.maxConnectedSpringBuffer.unmap();
+    
+            this.computeNodeForceBindGroup = this.device.createBindGroup({
+                layout: bindGroupLayout, // The layout created earlier
+                entries: [
+                    {
+                        binding: 0,  
+                        resource: {
+                            buffer: this.tempSpringForceBuffer  
+                        }
+                    },
+                    {
+                        binding: 1,  
+                        resource: {
+                            buffer: this.forceBuffer  
+                        }
+                    },
+                    {
+                        binding: 2,  
+                        resource: {
+                            buffer: this.maxConnectedSpringBuffer  
+                        }
+                    },
+                    {
+                        binding: 3,  
+                        resource: {
+                            buffer: this.numParticlesBuffer  
+                        }
                     }
+                ]
+            });
+        }
+        {
+            const bindGroupLayout = this.device.createBindGroupLayout({
+                entries: [
+                    {
+                        binding: 0, // The binding number in the shader
+                        visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                        buffer: { type: 'storage', minBindingSize: 0, },
+                    },
+                    {
+                        binding: 1, // The binding number in the shader
+                        visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                        buffer: { type: 'storage', minBindingSize: 0, },
+                    },
+                    {
+                        binding: 2, // The binding number in the shader
+                        visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                        buffer: { type: 'uniform', minBindingSize: 4 }, // Ensure this matches the shader's expectation
+                    },
+                    {
+                        binding: 3, // The binding number in the shader
+                        visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                        buffer: { type: 'uniform', minBindingSize: 4 }, // Ensure this matches the shader's expectation
+                    }
+                ]
+            });
+            
+            const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+        
+            this.computeNodeForceInitPipeline = this.device.createComputePipeline({
+                layout: computePipelineLayout,  
+                compute: {
+                    module: nodeForceComputeShaderModule,
+                    entryPoint: 'initialize',
                 },
-                {
-                    binding: 1,  
-                    resource: {
-                        buffer: this.forceBuffer  
+            });
+    
+            const maxConnectedSpringData = new Uint32Array([this.maxSpringConnected]);
+            this.maxConnectedSpringBuffer = this.device.createBuffer({
+                size: maxConnectedSpringData.byteLength,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+                mappedAtCreation: true,
+            });
+            new Uint32Array(this.maxConnectedSpringBuffer.getMappedRange()).set(maxConnectedSpringData);
+            this.maxConnectedSpringBuffer.unmap();
+    
+            this.computeNodeForceInitBindGroup = this.device.createBindGroup({
+                layout: bindGroupLayout, // The layout created earlier
+                entries: [
+                    {
+                        binding: 0,  
+                        resource: {
+                            buffer: this.tempSpringForceBuffer  
+                        }
+                    },
+                    {
+                        binding: 1,  
+                        resource: {
+                            buffer: this.forceBuffer  
+                        }
+                    },
+                    {
+                        binding: 2,  
+                        resource: {
+                            buffer: this.maxConnectedSpringBuffer  
+                        }
+                    },
+                    {
+                        binding: 3,  
+                        resource: {
+                            buffer: this.numParticlesBuffer  
+                        }
                     }
-                },
-                {
-                    binding: 2,  
-                    resource: {
-                        buffer: this.maxConnectedSpringBuffer  
-                    }
-                },
-                {
-                    binding: 3,  
-                    resource: {
-                        buffer: this.numParticlesBuffer  
-                    }
-                }
-            ]
-        });
+                ]
+            });
+        }
     }
 
     createRenderPipeline() {
@@ -775,40 +858,22 @@ export class ClothRenderer extends RendererOrigin {
         const computePass = commandEncoder.beginComputePass();
         computePass.setPipeline(this.computeSpringPipeline);
         computePass.setBindGroup(0, this.computeSpringBindGroup);
-        computePass.dispatchWorkgroups(Math.ceil(this.springs.length / 64.0)+1, 1, 1);
+        computePass.dispatchWorkgroups(Math.ceil(this.springs.length / 256.0)+1, 1, 1);
+        computePass.end();
+    }
+    InitNodeForce(commandEncoder:GPUCommandEncoder){        
+        const computePass = commandEncoder.beginComputePass();
+        computePass.setPipeline(this.computeNodeForceInitPipeline);
+        computePass.setBindGroup(0, this.computeNodeForceInitBindGroup);
+        computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 256.0)+1, 1, 1);        
         computePass.end();
     }
     summationNodeForce(commandEncoder:GPUCommandEncoder){        
         const computePass = commandEncoder.beginComputePass();
         computePass.setPipeline(this.computeNodeForcePipeline);
         computePass.setBindGroup(0, this.computeNodeForceBindGroup);
-        computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 256.0)+1, 1, 1);
+        computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 256.0)+1, 1, 1);        
         computePass.end();
-    }
-    async readBuffer(commandEncoder:GPUCommandEncoder){
-        const readBuffer = this.device.createBuffer({
-            size: this.maxSpringConnected * this.numParticles * 3 * 4,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-        });
-        commandEncoder.copyBufferToBuffer(
-            this.tempSpringForceBuffer, // 소스 버퍼
-            0, // 소스 시작 위치
-            readBuffer, // 대상 버퍼
-            0, // 대상 시작 위치
-            this.maxSpringConnected * this.numParticles * 3 * 4, // 복사할 데이터의 크기
-        );
-
-        await readBuffer.mapAsync(GPUMapMode.READ);
-        const arrayBuffer = readBuffer.getMappedRange();
-        const forceData = new Float32Array(arrayBuffer);
-
-        // 결과 출력
-        for (let i = 0; i < this.numParticles; i++) {
-            for(let j=0; j < this.maxSpringConnected; j++) {
-                console.log(`Particle ${i}: ForceX = ${forceData[i * this.numParticles + j]}, ForceY = ${forceData[i * this.numParticles + j + 1]}, ForceZ = ${forceData[i * this.numParticles + j + 2]}`);
-            }
-        }
-        readBuffer.unmap();
     }
     updateParticles(commandEncoder:GPUCommandEncoder) {        
         const computePass = commandEncoder.beginComputePass();
@@ -840,6 +905,7 @@ export class ClothRenderer extends RendererOrigin {
         passEncoder.end();
     }
 
+    
     makeRenderpassDescriptor(){
         this.renderPassDescriptor = {
             colorAttachments: [{
@@ -857,9 +923,39 @@ export class ClothRenderer extends RendererOrigin {
         };
     }
 
+    async readBackPositionBuffer() {
+        // Create a GPUBuffer for reading back the data
+        const readBackBuffer = this.device.createBuffer({
+            size: this.forceBuffer.size,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+    
+        // Create a command encoder and copy the position buffer to the readback buffer
+        const commandEncoder = this.device.createCommandEncoder();
+        commandEncoder.copyBufferToBuffer(this.forceBuffer, 0, readBackBuffer, 0, this.forceBuffer.size);
+        
+        // Submit the command to the GPU queue
+        const commands = commandEncoder.finish();
+        this.device.queue.submit([commands]);    
+    
+        // Map the readback buffer for reading and read its contents
+        await readBackBuffer.mapAsync(GPUMapMode.READ);
+        const arrayBuffer = readBackBuffer.getMappedRange(0, this.forceBuffer.size);
+        const data = new Float32Array(arrayBuffer);        
+        console.log("----");
+        for (let i = 0; i < data.length; i += 3) {            
+            console.log('vec3 Array:', [data[i], data[i + 1], data[i + 2]]);
+        }
+    
+        // Cleanup
+        readBackBuffer.unmap();
+        readBackBuffer.destroy();
+    }
+
     async render() {
         const currentTime = performance.now();
         this.frameCount++;
+        this.localFrameCount++;
 
         this.setCamera(this.camera);
         this.makeRenderpassDescriptor();
@@ -867,14 +963,20 @@ export class ClothRenderer extends RendererOrigin {
         const commandEncoder = this.device.createCommandEncoder();
         
         //compute pass
-        this.updateSprings(commandEncoder);
-        this.summationNodeForce(commandEncoder);
+        this.InitNodeForce(commandEncoder);
+        this.updateSprings(commandEncoder);        
+        this.summationNodeForce(commandEncoder);        
+        // if(this.localFrameCount%50===0){
+        //     await this.readBackPositionBuffer();
+        // }
+
         this.updateParticles(commandEncoder);
         
         //render pass
-        this.renderCloth(commandEncoder);
+        this.renderCloth(commandEncoder);        
         
-        this.device.queue.submit([commandEncoder.finish()]);
+        this.device.queue.submit([commandEncoder.finish()]);        
+        await this.device.queue.onSubmittedWorkDone();        
 
         if (currentTime - this.lastTime >= 1000) {
             // Calculate the FPS.
