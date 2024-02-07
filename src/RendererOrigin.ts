@@ -24,6 +24,8 @@ export class RendererOrigin {
     lastTime: number = 0;
     fpsDisplay;
 
+    localFrameCount:number =0;
+
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.camera = new Camera(
