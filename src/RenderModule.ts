@@ -18,10 +18,11 @@ export const Initialize = async () => {
 
   const sceneManager = new ClothRenderer("gfx-main");
   sceneManager.init().then(() => {    
-    sceneManager.createClothModel(128, 128, 700.0, 0.1);    
+    sceneManager.createClothModel(512, 512, 1000.0, 0.1);    
     sceneManager.createClothBuffers();
     sceneManager.createRenderPipeline();
     sceneManager.createSpringPipeline();
+    sceneManager.createTrianglePipeline();
     sceneManager.createParticlePipeline();
     sceneManager.createSpringForceComputePipeline();
     sceneManager.createNodeForceSummationPipeline();

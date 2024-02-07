@@ -53,6 +53,8 @@ export class ClothRenderer extends RendererOrigin {
 
     private particlePipeline!: GPURenderPipeline;
     private springPipeline!: GPURenderPipeline;
+    private trianglePipeline!: GPURenderPipeline;
+    private triangleBindGroup!: GPUBindGroup;
     private renderBindGroup!: GPUBindGroup;
 
     private computePipeline!: GPUComputePipeline;
@@ -77,6 +79,7 @@ export class ClothRenderer extends RendererOrigin {
     private fixedBuffer!: GPUBuffer;
     private springRenderBuffer!: GPUBuffer;
     private springCalculationBuffer!: GPUBuffer;
+    private triangleRenderBuffer!: GPUBuffer;
 
     //shader
     private particleShader!: ParticleShader;
@@ -84,8 +87,19 @@ export class ClothRenderer extends RendererOrigin {
 
     //particle information
     private particles: Node[] = [];
+    private uvIndicies: [number,number][] = [];
     private springs: Spring[] = [];
     private springIndicies!:Uint32Array;
+    private triangleIndicies!:Uint32Array;
+    private mesh!:Float32Array;
+    private uv!:Float32Array;
+    private meshBuffer!: GPUBuffer;
+    private uvBuffer!: GPUBuffer;
+
+    //mateirals
+    private texture!: GPUTexture
+    private view!: GPUTextureView
+    private sampler!: GPUSampler
 
     numParticles: number = 0;
 
@@ -103,7 +117,6 @@ export class ClothRenderer extends RendererOrigin {
     //for temp storage buffer
     maxSpringConnected:number = 0;
     private tempSpringForceBuffer!: GPUBuffer;
-    private mappedBuffer!: GPUBuffer;
 
     constructor(canvasId: string) {
         super(canvasId);
@@ -113,6 +126,7 @@ export class ClothRenderer extends RendererOrigin {
 
     async init() {
         await super.init();        
+        await this.createAssets();
     }
 
     createClothModel(x: number, y: number, ks: number, kd: number) {
@@ -141,9 +155,47 @@ export class ClothRenderer extends RendererOrigin {
 
                 const n = new Node(pos, vel);
 
+                let u = j / (this.M - 1);
+                let v = i / (this.N - 1);
+
+                this.uvIndicies.push([u, v]);
                 this.particles.push(n);
             }
         }
+
+        const combinedVertices: number[] = [];
+        this.particles.forEach((particle, index) => {
+            combinedVertices.push(...particle.position, ...this.uvIndicies[index]);
+        });
+
+        // Float32Array로 변환
+        const uvs: number[] = [];
+        this.uvIndicies.forEach((uv, index) => {
+            uvs.push(...uv);
+        });
+        this.mesh = new Float32Array(combinedVertices);
+        this.uv = new Float32Array(uvs);
+        let indices: number[] = [];
+
+        for (let i = 0; i < this.N - 1; i++) {
+            for (let j = 0; j < this.M - 1; j++) {
+                // 각 사각형의 왼쪽 위 Vertex 인덱스
+                const topLeft = i * this.M + j;
+                // 각 사각형의 오른쪽 위 Vertex 인덱스
+                const topRight = topLeft + 1;
+                // 각 사각형의 왼쪽 아래 Vertex 인덱스
+                const bottomLeft = (i + 1) * this.M + j;
+                // 각 사각형의 오른쪽 아래 Vertex 인덱스
+                const bottomRight = bottomLeft + 1;
+        
+                // 첫 번째 삼각형: topLeft, bottomLeft, topRight
+                indices.push(topLeft, bottomLeft, topRight);
+                // 두 번째 삼각형: topRight, bottomLeft, bottomRight
+                indices.push(topRight, bottomLeft, bottomRight);
+            }
+        }
+
+        this.triangleIndicies = new Uint32Array(indices);
 
         for(let i=0;i<this.N;i++){
             this.particles[i].fixed = true;
@@ -299,6 +351,59 @@ export class ClothRenderer extends RendererOrigin {
         console.log("maxSpringConnected : #",this.maxSpringConnected);
     }
 
+    async createTextureFromImage(src:string) {
+        const response: Response = await fetch(src);
+        const blob: Blob = await response.blob();
+        const imageData: ImageBitmap = await createImageBitmap(blob);
+
+        await this.loadImageBitmap(this.device, imageData);
+
+        const viewDescriptor: GPUTextureViewDescriptor = {
+            format: "rgba8unorm",
+            dimension: "2d",
+            aspect: "all",
+            baseMipLevel: 0,
+            mipLevelCount: 1,
+            baseArrayLayer: 0,
+            arrayLayerCount: 1
+        };
+        this.view = this.texture.createView(viewDescriptor);
+
+        const samplerDescriptor: GPUSamplerDescriptor = {
+            addressModeU: "repeat",
+            addressModeV: "repeat",
+            magFilter: "linear",
+            minFilter: "nearest",
+            mipmapFilter: "nearest",
+            maxAnisotropy: 1
+        };
+        this.sampler = this.device.createSampler(samplerDescriptor);
+    }
+
+    async loadImageBitmap(device: GPUDevice, imageData: ImageBitmap) {
+
+        const textureDescriptor: GPUTextureDescriptor = {
+            size: {
+                width: imageData.width,
+                height: imageData.height
+            },
+            format: "rgba8unorm",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
+        };
+
+        this.texture = device.createTexture(textureDescriptor);
+
+        device.queue.copyExternalImageToTexture(
+            {source: imageData},
+            {texture: this.texture},
+            textureDescriptor.size
+        );
+    }
+
+    async createAssets() {
+        await this.createTextureFromImage("./logo.jpg");
+    }
+
     createClothBuffers() {
         const positionData = new Float32Array(this.particles.flatMap(p => [p.position[0], p.position[1], p.position[2]]));
         const velocityData = new Float32Array(this.particles.flatMap(p => [p.velocity[0], p.velocity[1], p.velocity[2]]));
@@ -343,7 +448,7 @@ export class ClothRenderer extends RendererOrigin {
         new Uint32Array(this.fixedBuffer.getMappedRange()).set(fixedData);
         this.fixedBuffer.unmap();
 
-        this.springIndicies = new Uint32Array(this.springs.length * 2); // 5 elements per spring
+        this.springIndicies = new Uint32Array(this.springs.length * 2);
         this.springs.forEach((spring, i) => {
             let offset = i * 2;
             this.springIndicies[offset] = spring.index1;
@@ -357,6 +462,30 @@ export class ClothRenderer extends RendererOrigin {
         });
         new Uint32Array(this.springRenderBuffer.getMappedRange()).set(this.springIndicies);
         this.springRenderBuffer.unmap();
+
+        this.meshBuffer = this.device.createBuffer({
+            size: this.mesh.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true
+        });
+        new Float32Array(this.meshBuffer.getMappedRange()).set(this.mesh);
+        this.meshBuffer.unmap();
+
+        this.uvBuffer = this.device.createBuffer({
+            size: this.uv.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true
+        });
+        new Float32Array(this.uvBuffer.getMappedRange()).set(this.uv);
+        this.uvBuffer.unmap();
+
+        this.triangleRenderBuffer = this.device.createBuffer({
+            size: this.triangleIndicies.byteLength,
+            usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        new Uint32Array(this.triangleRenderBuffer.getMappedRange()).set(this.triangleIndicies);
+        this.triangleRenderBuffer.unmap();
 
         const springCalcData = new Float32Array(this.springs.length * 7); // 7 elements per spring
         this.springs.forEach((spring, i) => {
@@ -396,12 +525,6 @@ export class ClothRenderer extends RendererOrigin {
         });
         new Float32Array(this.tempSpringForceBuffer.getMappedRange()).set(nodeSpringConnectedData);
         this.tempSpringForceBuffer.unmap();
-
-        this.mappedBuffer = this.device.createBuffer({
-            label: "mapped buffer",
-            size: nodeSpringConnectedData.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
-        });
     }
 
     createSpringForceComputePipeline(){
@@ -768,6 +891,101 @@ export class ClothRenderer extends RendererOrigin {
         });
     }
 
+    createTrianglePipeline() {
+        const textureShaderModule = this.device.createShaderModule({ code: this.particleShader.getTextureShader() });
+
+        // Assuming bindGroupLayout and pipelineLayout are similar to createParticlePipeline
+        // You may reuse the same layout if it fits your needs
+
+        const bindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: {}
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {}
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {}
+                },
+            ]
+        });
+
+        this.triangleBindGroup = this.device.createBindGroup({
+            layout: bindGroupLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: this.mvpUniformBuffer
+                    }
+                },
+                {
+                    binding: 1,
+                    resource: this.view
+                },
+                {
+                    binding: 2,
+                    resource: this.sampler
+                }
+            ]
+        });
+
+        const pipelineLayout = this.device.createPipelineLayout({
+            bindGroupLayouts: [bindGroupLayout], // Include the bind group layout created above
+        });
+
+        this.trianglePipeline = this.device.createRenderPipeline({
+            layout: pipelineLayout, // Reuse or create as needed
+            vertex: {
+                module: textureShaderModule,
+                entryPoint: 'vs_main',
+                buffers: [{
+                    arrayStride: 12,
+                    attributes: [
+                        {
+                            shaderLocation: 0,
+                            format: "float32x3",
+                            offset: 0
+                        }
+                    ]
+                },
+                {
+                    arrayStride: 8,
+                    attributes: [
+                        {
+                            shaderLocation: 1,
+                            format: "float32x2",
+                            offset: 0
+                        }
+                    ]
+                }
+            ],
+            },
+            fragment: {
+                module: textureShaderModule,
+                entryPoint: 'fs_main',
+                targets: [{ format: this.format }],
+            },
+            primitive: {
+                topology: 'triangle-list',
+                // Additional configurations as needed
+            },
+            // Reuse depthStencil configuration
+            depthStencil: {
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+                format: 'depth32float',
+            },
+        });
+    }
+
     createParticlePipeline(){
         const computeShaderModule = this.device.createShaderModule({ code: this.particleShader.getComputeShader() });
     
@@ -891,16 +1109,23 @@ export class ClothRenderer extends RendererOrigin {
     }
     renderCloth(commandEncoder:GPUCommandEncoder){        
         const passEncoder = commandEncoder.beginRenderPass(this.renderPassDescriptor);
-        passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
-        passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer                
-        passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
-        passEncoder.draw(this.N * this.M); // Draw the cube using the index count
+        // passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
+        // passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer                
+        // passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
+        // passEncoder.draw(this.N * this.M); // Draw the cube using the index count
 
-        passEncoder.setPipeline(this.springPipeline);
+        // passEncoder.setPipeline(this.springPipeline);
+        // passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        // passEncoder.setIndexBuffer(this.springRenderBuffer, 'uint32'); // 인덱스 포맷 수정
+        // passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
+        // passEncoder.drawIndexed(this.springIndicies.length);
+
+        passEncoder.setPipeline(this.trianglePipeline);
         passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        passEncoder.setIndexBuffer(this.springRenderBuffer, 'uint32'); // 인덱스 포맷 수정
-        passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
-        passEncoder.drawIndexed(this.springIndicies.length);
+        passEncoder.setVertexBuffer(1, this.uvBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        passEncoder.setIndexBuffer(this.triangleRenderBuffer, 'uint32'); // 인덱스 포맷 수정
+        passEncoder.setBindGroup(0, this.triangleBindGroup); // Set the bind group with MVP matrix
+        passEncoder.drawIndexed(this.triangleIndicies.length);
 
         passEncoder.end();
     }
@@ -978,20 +1203,13 @@ export class ClothRenderer extends RendererOrigin {
         this.device.queue.submit([commandEncoder.finish()]);        
         await this.device.queue.onSubmittedWorkDone();        
 
-        if (currentTime - this.lastTime >= 1000) {
-            // Calculate the FPS.
-            const fps = this.frameCount;
+        var ms = (currentTime - this.lastTime).toFixed(2);
 
-            // Optionally, display the FPS in the browser.
-            if (this.fpsDisplay) {
-                this.fpsDisplay.textContent = `FPS: ${fps}`;
-            } else {
-                console.log(`FPS: ${fps}`);
-            }
-
-            // Reset the frame count and update the last time check.
-            this.frameCount = 0;
-            this.lastTime = currentTime;
+        if (this.fpsDisplay) {
+            this.fpsDisplay.textContent = `${ms}ms`;
+        } else {
+            console.log(`${ms}ms`);
         }
+        this.lastTime = currentTime;
     }
 }
