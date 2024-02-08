@@ -62,6 +62,7 @@ export class ClothRenderer extends RendererOrigin {
     private texture!: GPUTexture
     private view!: GPUTextureView
     private sampler!: GPUSampler
+    private camPosBuffer!: GPUBuffer;
 
     numParticles: number = 0;
 
@@ -395,7 +396,7 @@ export class ClothRenderer extends RendererOrigin {
     }
 
     async createAssets() {
-        await this.createTextureFromImage("./logo.jpg");
+        await this.createTextureFromImage("./argyle_pattern.jpg");
     }
 
     createClothBuffers() {
@@ -479,6 +480,11 @@ export class ClothRenderer extends RendererOrigin {
         });
         new Float32Array(this.tempSpringForceBuffer.getMappedRange()).set(nodeSpringConnectedData);
         this.tempSpringForceBuffer.unmap();
+
+        this.camPosBuffer = this.device.createBuffer({
+            size: 4 * Float32Array.BYTES_PER_ELEMENT, // vec3<f32> + padding
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
     }
 
     createSpringForceComputePipeline() {
@@ -848,8 +854,8 @@ export class ClothRenderer extends RendererOrigin {
     createTrianglePipeline() {
         const textureShaderModule = this.device.createShaderModule({ code: this.particleShader.getTextureShader() });
 
-        // Assuming bindGroupLayout and pipelineLayout are similar to createParticlePipeline
-        // You may reuse the same layout if it fits your needs
+        //for binding camera pos
+
 
         const bindGroupLayout = this.device.createBindGroupLayout({
             entries: [
@@ -867,6 +873,13 @@ export class ClothRenderer extends RendererOrigin {
                     binding: 2,
                     visibility: GPUShaderStage.FRAGMENT,
                     sampler: {}
+                },
+                {
+                    binding: 3, // 새로운 바인딩 추가
+                    visibility: GPUShaderStage.FRAGMENT, // camPos는 프래그먼트 쉐이더에서 사용
+                    buffer: {
+                        type: 'uniform',
+                    }
                 },
             ]
         });
@@ -887,6 +900,12 @@ export class ClothRenderer extends RendererOrigin {
                 {
                     binding: 2,
                     resource: this.sampler
+                },
+                {
+                    binding: 3,
+                    resource: {
+                        buffer: this.camPosBuffer
+                    }
                 }
             ]
         });
@@ -1083,6 +1102,12 @@ export class ClothRenderer extends RendererOrigin {
         // passEncoder.setIndexBuffer(this.springRenderBuffer, 'uint32'); // 인덱스 포맷 수정
         // passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
         // passEncoder.drawIndexed(this.springIndicies.length);
+
+        this.device.queue.writeBuffer(
+            this.camPosBuffer,
+            0,
+            new Float32Array([...this.camera.position, 1.0]) // vec3 + padding
+        );
 
         passEncoder.setPipeline(this.trianglePipeline);
         passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
