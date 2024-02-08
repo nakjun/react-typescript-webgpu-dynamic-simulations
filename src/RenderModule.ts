@@ -2,7 +2,7 @@ import { Renderer } from "./[01].ParticleSystem/Renderer";
 import { ClothRenderer } from "./[02].ClothSystem/Renderer";
 
 
-export const Initialize = async () => {    
+export const Initialize = async () => {
   // const sceneManager = new Renderer("gfx-main");
   // sceneManager.init().then(() => {   
   //   sceneManager.createBuffers();
@@ -17,8 +17,8 @@ export const Initialize = async () => {
 
 
   const sceneManager = new ClothRenderer("gfx-main");
-  sceneManager.init().then(() => {    
-    sceneManager.createClothModel(512, 512, 1000.0, 0.1);    
+  sceneManager.init().then(() => {
+    sceneManager.createClothModel(64, 64, 500.0, 0.25);
     sceneManager.createClothBuffers();
     sceneManager.createRenderPipeline();
     sceneManager.createSpringPipeline();
@@ -26,7 +26,7 @@ export const Initialize = async () => {
     sceneManager.createParticlePipeline();
     sceneManager.createSpringForceComputePipeline();
     sceneManager.createNodeForceSummationPipeline();
-    
+
     animate();
   });
 

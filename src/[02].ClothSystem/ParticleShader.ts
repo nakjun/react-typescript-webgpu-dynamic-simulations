@@ -1,4 +1,4 @@
-export class ParticleShader {    
+export class ParticleShader {
     particle_shader = `
         struct TransformData {
             model: mat4x4<f32>,
@@ -80,26 +80,31 @@ export class ParticleShader {
     @binding(0) @group(0) var<uniform> transformUBO: TransformData;
     @binding(1) @group(0) var myTexture: texture_2d<f32>;
     @binding(2) @group(0) var mySampler: sampler;
+    @binding(3) @group(0) var<uniform> cameraPos: vec3<f32>;
     
-    struct Fragment {
+    struct VertexOutput {
         @builtin(position) Position : vec4<f32>,
-        @location(0) TexCoord : vec2<f32>
+        @location(0) TexCoord : vec2<f32>,
+        @location(1) Normal : vec3<f32>,
     };
     
     @vertex
-    fn vs_main(@location(0) vertexPostion: vec3<f32>, @location(1) vertexTexCoord: vec2<f32>) -> Fragment {
-    
-        var output : Fragment;
-        output.Position = transformUBO.projection * transformUBO.view * transformUBO.model * vec4<f32>(vertexPostion, 1.0);
+    fn vs_main(@location(0) vertexPosition: vec3<f32>, @location(1) vertexTexCoord: vec2<f32>, @location(2) vertexNormal: vec3<f32>) -> VertexOutput {
+        var output : VertexOutput;
+        output.Position = transformUBO.projection * transformUBO.view * transformUBO.model * vec4<f32>(vertexPosition, 1.0);
         output.TexCoord = vertexTexCoord;
-    
+        output.Normal = (transformUBO.model * vec4<f32>(vertexNormal, 0.0)).xyz; // 모델 변환 적용
         return output;
     }
     
     @fragment
-    fn fs_main(@location(0) TexCoord : vec2<f32>) -> @location(0) vec4<f32> {
-        return textureSample(myTexture, mySampler, TexCoord);
-    }
+fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>) -> @location(0) vec4<f32> {
+    let lightDir = normalize(vec3<f32>(0.0, 0.0, 1.0)); // 빛의 방향
+    let diff = max(dot(Normal, lightDir), 1.0); // Lambertian 반사율
+    let texColor = textureSample(myTexture, mySampler, TexCoord);
+    return texColor * diff; // 텍스처 색상에 따른 라이팅 적용
+    //return texColor;
+}
     `;
 
     freefallComputeShader = `
@@ -156,19 +161,19 @@ export class ParticleShader {
 
     lineShader = ``;
 
-    getParticleShader(){
+    getParticleShader() {
         return this.particle_shader;
     }
 
-    getComputeShader(){
+    getComputeShader() {
         return this.freefallComputeShader;
     }
 
-    getSpringShader(){
+    getSpringShader() {
         return this.springShader;
     }
 
-    getTextureShader(){
+    getTextureShader() {
         return this.textureShader;
     }
 }
