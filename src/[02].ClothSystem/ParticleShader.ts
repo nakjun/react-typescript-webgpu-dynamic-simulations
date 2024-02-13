@@ -142,14 +142,13 @@ export class ParticleShader {
     }
 
     fn getForce(index:u32) -> vec3<f32>{
-        return vec3<f32>(force[index*3],force[index*3+1],force[index*3+2]);
+        return vec3<f32>(force[index*3] / 2.0,force[index*3+1] / 2.0,force[index*3+2] / 2.0);
     }
 
     @compute 
     @workgroup_size(256)
     fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let index: u32 = global_id.x;
-
         var fixed = fixed[index];
         
         if(fixed==1){
@@ -161,7 +160,7 @@ export class ParticleShader {
         var f = getForce(index);        
         
         var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);
-        var deltaTime: f32 = 0.01; // Assuming 60 FPS for simplicity
+        var deltaTime: f32 = 0.001; // Assuming 60 FPS for simplicity
 
         vel += ((f + gravity) * deltaTime);
         pos += (vel * deltaTime);

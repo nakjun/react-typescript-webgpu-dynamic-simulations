@@ -71,7 +71,11 @@ export class ClothRenderer extends RendererOrigin {
     //cloth information
     N: number = 0;
     M: number = 0;
-    kS: number = 0;
+    
+    structuralKs: number = 1000.0;
+    shearKs: number = 1000.0;
+    bendKs: number = 1000.0;
+
     kD: number = 0;
 
     xSize: number = 30.0;
@@ -92,11 +96,13 @@ export class ClothRenderer extends RendererOrigin {
         await this.createAssets();
     }
 
-    createClothModel(x: number, y: number, ks: number, kd: number) {
+    createClothModel(x: number, y: number, structuralKs:number=5000.0, shearKs:number=2000.0, bendKs:number=500.0, kd:number=0.25) {
 
         this.N = x;
         this.M = y;
-        this.kS = ks;
+        this.structuralKs = structuralKs;
+        this.shearKs = shearKs;
+        this.bendKs = bendKs;
         this.kD = kd;
 
         this.createParticles();
@@ -192,9 +198,13 @@ export class ClothRenderer extends RendererOrigin {
 
         this.triangleIndicies = new Uint32Array(indices);
 
-        for (let i = 0; i < this.N; i += 2) {
+        //first line fix
+        for (let i = 0; i < this.N; i++) {
             this.particles[i].fixed = true;
         }
+        //0, N fix       
+        // this.particles[0].fixed = true;
+        // this.particles[this.N-1].fixed = true;
 
         this.numParticles = this.particles.length;
         console.log("create node success");
@@ -207,7 +217,7 @@ export class ClothRenderer extends RendererOrigin {
                 const sp = new Spring(
                     this.particles[index],
                     this.particles[index + 1],
-                    this.kS,
+                    this.structuralKs,
                     this.kD,
                     "structural",
                     index,
@@ -228,7 +238,7 @@ export class ClothRenderer extends RendererOrigin {
                 const sp = new Spring(
                     this.particles[this.N * i + j],
                     this.particles[this.N * i + j + this.N],
-                    this.kS,
+                    this.structuralKs,
                     this.kD,
                     "structural",
                     this.N * i + j,
@@ -251,7 +261,7 @@ export class ClothRenderer extends RendererOrigin {
             const sp = new Spring(
                 this.particles[index],
                 this.particles[index + this.N + 1],
-                this.kS,
+                this.shearKs,
                 this.kD,
                 "shear",
                 index,
@@ -274,7 +284,7 @@ export class ClothRenderer extends RendererOrigin {
             const sp = new Spring(
                 this.particles[index],
                 this.particles[index + this.N - 1],
-                this.kS,
+                this.shearKs,
                 this.kD,
                 "shear",
                 index,
@@ -297,7 +307,7 @@ export class ClothRenderer extends RendererOrigin {
             const sp = new Spring(
                 this.particles[index],
                 this.particles[index + 2],
-                this.kS,
+                this.bendKs,
                 this.kD,
                 "bending",
                 index,
@@ -316,7 +326,7 @@ export class ClothRenderer extends RendererOrigin {
                 const sp = new Spring(
                     this.particles[i + (j * this.M)],
                     this.particles[i + (j + 3) * this.M],
-                    this.kS,
+                    this.bendKs,
                     this.kD,
                     "bending",
                     i + (j * this.M),

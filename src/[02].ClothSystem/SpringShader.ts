@@ -51,8 +51,13 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 
     var len = length(posDirection);
     var forceDirection = normalize(posDirection);
-    var spforce = (len - spring.mRestLen) * spring.ks;    
-    var damp = dot(velDirection, forceDirection) / len * spring.kd;    
+    var spforce = (len - spring.mRestLen) * spring.ks;  
+    
+    var s1 = dot(vel1,forceDirection);
+    var s2 = dot(vel2,forceDirection);
+
+    //var damp = dot(velDirection, forceDirection) / len * spring.kd;    
+    var damp = -spring.kd * (s1 + s2);
 
     var estimatedForce = forceDirection * (spforce+damp) / len;              
 
@@ -89,7 +94,7 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
         var f = getForce(id);        
         f.x = 0.0;
         f.y = 0.0;
-        f.z = 0.0;
+        f.z = 5.0;
         
         // 파티클별 힘 합산을 0으로 초기화
         // 각 파티클에 대해 연결된 모든 스프링의 힘을 합산
@@ -102,10 +107,6 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
             f.y += nodeForce[i * 3 + 1];
             f.z += nodeForce[i * 3 + 2];
         }
-
-        // force[id * 3 + 0] = f32(id * maxConnectedSpring);
-        // force[id * 3 + 1] = f32(end);
-        // force[id * 3 + 2] = f32(id);
 
         force[id*3 + 0] = f32(f.x);
         force[id*3 + 1] = f32(f.y);

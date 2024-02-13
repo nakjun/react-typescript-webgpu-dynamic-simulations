@@ -36,8 +36,8 @@ export class Spring {
         this.n1 = _n1;
         this.n2 = _n2;
 
-        this.kS = Math.round((ks + Number.EPSILON) * 100) / 100;
-        this.kD = Math.round((kd + Number.EPSILON) * 10000) / 10000;
+        this.kS = ks
+        this.kD = kd;
         this.type = type;
 
         this.mRestLen = Math.round((vec3.distance(this.n1.position, this.n2.position) + Number.EPSILON) * 100) / 100;
