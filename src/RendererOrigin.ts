@@ -2,6 +2,7 @@ import { mat4, vec3 } from 'gl-matrix';
 import { Camera } from './WebGPU/Camera';
 import { Shader } from './[01].ParticleSystem/Shader';
 import { Model } from './[00].Cube/Model';
+import { SystemGUI } from './GUI/GUI';
 
 export class RendererOrigin {
 
@@ -13,9 +14,11 @@ export class RendererOrigin {
     pipeline!: GPURenderPipeline;
     mvpUniformBuffer!: GPUBuffer;
 
+    systemGUI!:SystemGUI;
+
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(5.0, 10.0, 80.0);
+    camera_position: vec3 = vec3.fromValues(70.0, 28.0, 40.0);
     camera_target: vec3 = vec3.fromValues(0.0, 0.0, 0.0);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
@@ -23,8 +26,12 @@ export class RendererOrigin {
     frameCount: number = 0;
     lastTime: number = 0;
     fpsDisplay;
-
     localFrameCount:number =0;
+
+    stats = {
+        fps: 0,
+        ms:""
+    };
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -39,6 +46,10 @@ export class RendererOrigin {
         );
         console.log("Renderer initialized");
         this.fpsDisplay = document.getElementById('fpsDisplay');
+
+        this.systemGUI = new SystemGUI();        
+        this.systemGUI.performanceGui.add(this.stats, 'ms').name('ms').listen();
+        this.systemGUI.performanceGui.add(this.stats, 'fps').name('fps').listen();
     }
 
     async init() {
@@ -61,7 +72,7 @@ export class RendererOrigin {
         this.depthTexture = this.device.createTexture({
             size: { width: this.canvas.width, height: this.canvas.height, depthOrArrayLayers: 1 },
             format: 'depth32float',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
         });
     }
 
@@ -96,5 +107,20 @@ export class RendererOrigin {
             0, // Start at the beginning of the data
             data.byteLength // The amount of data to write
         );
+    }
+
+    rotateCamera(dx:number, dy:number){
+        this.camera.position[0] += dx;
+        this.camera.position[1] += dy;
+        console.log(this.camera_position);
+    }
+
+    panCamera(dx:number, dy:number){
+
+    }
+
+    zoomCamera(value:number){
+        this.camera_position[2] += value;
+        console.log(this.camera_position);
     }
 }

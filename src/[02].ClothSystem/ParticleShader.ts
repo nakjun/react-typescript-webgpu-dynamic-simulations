@@ -160,7 +160,7 @@ export class ParticleShader {
         var f = getForce(index);        
         
         var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);
-        var deltaTime: f32 = 0.001; // Assuming 60 FPS for simplicity
+        var deltaTime: f32 = 0.002; // Assuming 60 FPS for simplicity
 
         vel += ((f + gravity) * deltaTime);
         pos += (vel * deltaTime);

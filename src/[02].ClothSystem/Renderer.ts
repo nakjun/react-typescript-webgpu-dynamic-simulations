@@ -88,7 +88,7 @@ export class ClothRenderer extends RendererOrigin {
     constructor(canvasId: string) {
         super(canvasId);
         this.particleShader = new ParticleShader();
-        this.springShader = new SpringShader();
+        this.springShader = new SpringShader();        
     }
 
     async init() {
@@ -406,7 +406,7 @@ export class ClothRenderer extends RendererOrigin {
     }
 
     async createAssets() {
-        await this.createTextureFromImage("./argyle_pattern.jpg");
+        await this.createTextureFromImage("./textures/siggraph.png");
     }
 
     createClothBuffers() {
@@ -1203,13 +1203,9 @@ export class ClothRenderer extends RendererOrigin {
         this.device.queue.submit([commandEncoder.finish()]);
         await this.device.queue.onSubmittedWorkDone();
 
-        var ms = (currentTime - this.lastTime).toFixed(2);
+        this.stats.ms = (currentTime - this.lastTime).toFixed(2);
+        this.stats.fps = Math.round(1000.0 / (currentTime - this.lastTime));
 
-        if (this.fpsDisplay) {
-            this.fpsDisplay.textContent = `${ms}ms`;
-        } else {
-            console.log(`${ms}ms`);
-        }
         this.lastTime = currentTime;
     }
 }
