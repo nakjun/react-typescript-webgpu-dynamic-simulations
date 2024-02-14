@@ -132,7 +132,8 @@ export class ClothRenderer extends RendererOrigin {
 
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
-                var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), 0.0);
+                //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), 0.0);
+                var pos = vec3.fromValues(start_x + (dist_x * j), 10.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -199,12 +200,18 @@ export class ClothRenderer extends RendererOrigin {
         this.triangleIndicies = new Uint32Array(indices);
 
         //first line fix
-        for (let i = 0; i < this.N; i++) {
-            this.particles[i].fixed = true;
-        }
+        // for (let i = 0; i < this.N; i++) {
+        //     this.particles[i].fixed = true;
+        // }
+        // for (let i = 0; i < this.N / 3; i++) {
+        //     this.particles[i].fixed = true;
+        // }
+        // for (let i = this.N / 2; i < this.N; i++) {
+        //     this.particles[i].fixed = true;
+        // }
         //0, N fix       
-        // this.particles[0].fixed = true;
-        // this.particles[this.N-1].fixed = true;
+        this.particles[0].fixed = true;
+        this.particles[this.N-1].fixed = true;
 
         this.numParticles = this.particles.length;
         console.log("create node success");

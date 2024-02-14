@@ -94,7 +94,7 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
         var f = getForce(id);        
         f.x = 0.0;
         f.y = 0.0;
-        f.z = 15.0; //z방향 wind
+        f.z = 1.0; //z방향 wind
         
         // 파티클별 힘 합산을 0으로 초기화
         // 각 파티클에 대해 연결된 모든 스프링의 힘을 합산
