@@ -3,7 +3,9 @@ import { ParticleShader } from './ParticleShader';
 import { SpringShader } from './SpringShader';
 import { RendererOrigin } from '../RendererOrigin';
 import { Node, Spring } from '../Physics/Physics';
-import { makeFloat32ArrayBuffer, makeFloat32ArrayBufferStorage, makeUInt32ArrayBuffer } from '../WebGPU/Buffer';
+import { makeFloat32ArrayBuffer, makeFloat32ArrayBufferStorage, makeUInt32ArrayBuffer, makeUInt32IndexArrayBuffer } from '../WebGPU/Buffer';
+
+import { Model } from '../Common/Model';
 
 export class ClothRenderer extends RendererOrigin {
 
@@ -48,17 +50,17 @@ export class ClothRenderer extends RendererOrigin {
 
     //particle information
     private particles: Node[] = [];
-    private uvIndicies: [number, number][] = [];
+    private uvIndices: [number, number][] = [];
     private springs: Spring[] = [];
-    private springIndicies!: Uint32Array;
-    private triangleIndicies!: Uint32Array;
+    private springIndices!: Uint32Array;
+    private triangleIndices!: Uint32Array;
     private mesh!: Float32Array;
     private uv!: Float32Array;
     private meshBuffer!: GPUBuffer;
     private uvBuffer!: GPUBuffer;
     private normals!: Array<vec3>;
 
-    //mateirals
+    //mateirals - cloth
     private texture!: GPUTexture
     private view!: GPUTextureView
     private sampler!: GPUSampler
@@ -78,22 +80,64 @@ export class ClothRenderer extends RendererOrigin {
 
     kD: number = 0;
 
-    xSize: number = 30.0;
-    ySize: number = 30.0;
+    xSize: number = 50.0;
+    ySize: number = 50.0;
 
     //for temp storage buffer
     maxSpringConnected: number = 0;
     private tempSpringForceBuffer!: GPUBuffer;
 
+    //sphere model
+    private modelGenerator!: Model;
+    private sphereRadious!: number;
+    private sphereSegments!: number;
+    private spherePosition!: vec3;  
+    private spherePosBuffer!: GPUBuffer;
+    private sphereIndexBuffer!: GPUBuffer;  
+    private sphereUVBuffer!: GPUBuffer;
+    private sphereNormalBuffer!: GPUBuffer;
+    private sphereIndicesLength!: number;
+    private sphereBindGroup!: GPUBindGroup;
+
+    //mateirals - sphere
+    private textureSphere!: GPUTexture
+    private viewSphere!: GPUTextureView
+    private samplerSphere!: GPUSampler    
+
     constructor(canvasId: string) {
         super(canvasId);
         this.particleShader = new ParticleShader();
-        this.springShader = new SpringShader();        
+        this.springShader = new SpringShader();     
+        
+        this.modelGenerator = new Model();             
     }
 
     async init() {
         await super.init();
         await this.createAssets();
+    }
+
+    createSphereModel(){
+        this.sphereRadious = 10.0;
+        this.sphereSegments = 64;
+        this.spherePosition = vec3.fromValues(0.0,0.0,0.0);
+        var sphere = this.modelGenerator.createSphere(this.sphereRadious, this.sphereSegments, this.spherePosition);
+
+        var vertArray = new Float32Array(sphere.vertices);
+        var indArray = new Uint32Array(sphere.indices);
+        var uvArray = new Float32Array(sphere.uvs);
+        var normalArray = new Float32Array(sphere.normals);
+
+        this.sphereIndicesLength = sphere.indices.length;
+
+        //console.log(vertArray, indArray, uvArray);
+
+        this.spherePosBuffer = makeFloat32ArrayBufferStorage(this.device, vertArray);
+        this.sphereIndexBuffer = makeUInt32IndexArrayBuffer(this.device, indArray);        
+        this.sphereUVBuffer = makeFloat32ArrayBufferStorage(this.device, uvArray);
+        this.sphereNormalBuffer = makeFloat32ArrayBufferStorage(this.device, normalArray);
+        
+        
     }
 
     createClothModel(x: number, y: number, structuralKs:number=5000.0, shearKs:number=2000.0, bendKs:number=500.0, kd:number=0.25) {
@@ -133,30 +177,29 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
                 //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), 0.0);
-                var pos = vec3.fromValues(start_x + (dist_x * j), 10.0, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x + (dist_x * j), 12.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
 
-                let u = j / (this.M - 1);
+                let u = 1.0 - j / (this.M - 1);
                 let v = i / (this.N - 1);
 
-                this.uvIndicies.push([u, v]);
+                this.uvIndices.push([u, v]);
                 this.particles.push(n);
             }
         }
 
         const combinedVertices: number[] = [];
         this.particles.forEach((particle, index) => {
-            combinedVertices.push(...particle.position, ...this.uvIndicies[index]);
+            combinedVertices.push(...particle.position, ...this.uvIndices[index]);
         });
 
         // Float32Array로 변환
         const uvs: number[] = [];
-        this.uvIndicies.forEach((uv, index) => {
+        this.uvIndices.forEach((uv, index) => {
             uvs.push(...uv);
         });
-        this.mesh = new Float32Array(combinedVertices);
         this.uv = new Float32Array(uvs);
         let indices: number[] = [];
 
@@ -197,7 +240,7 @@ export class ClothRenderer extends RendererOrigin {
             vec3.normalize(normal, normal);
         });
 
-        this.triangleIndicies = new Uint32Array(indices);
+        this.triangleIndices = new Uint32Array(indices);
 
         //first line fix
         // for (let i = 0; i < this.N; i++) {
@@ -210,8 +253,8 @@ export class ClothRenderer extends RendererOrigin {
         //     this.particles[i].fixed = true;
         // }
         //0, N fix       
-        this.particles[0].fixed = true;
-        this.particles[this.N-1].fixed = true;
+        // this.particles[0].fixed = true;
+        // this.particles[this.N-1].fixed = true;
 
         this.numParticles = this.particles.length;
         console.log("create node success");
@@ -363,14 +406,14 @@ export class ClothRenderer extends RendererOrigin {
         console.log("maxSpringConnected : #", this.maxSpringConnected);
     }
 
-    async createTextureFromImage(src: string) {
+    async createTextureFromImage(src: string, device: GPUDevice): Promise<{texture: GPUTexture, sampler: GPUSampler, view: GPUTextureView}> {
         const response: Response = await fetch(src);
         const blob: Blob = await response.blob();
         const imageData: ImageBitmap = await createImageBitmap(blob);
-
-        await this.loadImageBitmap(this.device, imageData);
-
-        const viewDescriptor: GPUTextureViewDescriptor = {
+    
+        const texture = await this.loadImageBitmap(device, imageData);
+    
+        const view = texture.createView({
             format: "rgba8unorm",
             dimension: "2d",
             aspect: "all",
@@ -378,22 +421,22 @@ export class ClothRenderer extends RendererOrigin {
             mipLevelCount: 1,
             baseArrayLayer: 0,
             arrayLayerCount: 1
-        };
-        this.view = this.texture.createView(viewDescriptor);
-
-        const samplerDescriptor: GPUSamplerDescriptor = {
+        });
+    
+        const sampler = device.createSampler({
             addressModeU: "repeat",
             addressModeV: "repeat",
             magFilter: "linear",
             minFilter: "nearest",
             mipmapFilter: "nearest",
             maxAnisotropy: 1
-        };
-        this.sampler = this.device.createSampler(samplerDescriptor);
+        });
+    
+        return { texture, sampler, view };
     }
-
-    async loadImageBitmap(device: GPUDevice, imageData: ImageBitmap) {
-
+    
+    async loadImageBitmap(device: GPUDevice, imageData: ImageBitmap): Promise<GPUTexture> {
+    
         const textureDescriptor: GPUTextureDescriptor = {
             size: {
                 width: imageData.width,
@@ -402,19 +445,30 @@ export class ClothRenderer extends RendererOrigin {
             format: "rgba8unorm",
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
         };
-
-        this.texture = device.createTexture(textureDescriptor);
-
+    
+        const texture = device.createTexture(textureDescriptor);
+    
         device.queue.copyExternalImageToTexture(
             { source: imageData },
-            { texture: this.texture },
-            textureDescriptor.size
+            { texture: texture },
+            { width: imageData.width, height: imageData.height }
         );
+    
+        return texture;
     }
-
+    
     async createAssets() {
-        await this.createTextureFromImage("./textures/siggraph.png");
+        const assets1 = await this.createTextureFromImage("./textures/siggraph.png", this.device);
+        this.texture = assets1.texture;
+        this.sampler = assets1.sampler;
+        this.view = assets1.view;
+    
+        const assets2 = await this.createTextureFromImage("./textures/metal.jpg", this.device);
+        this.textureSphere = assets2.texture;
+        this.samplerSphere = assets2.sampler;
+        this.viewSphere = assets2.view;
     }
+    
 
     createClothBuffers() {
         const positionData = new Float32Array(this.particles.flatMap(p => [p.position[0], p.position[1], p.position[2]]));
@@ -440,23 +494,22 @@ export class ClothRenderer extends RendererOrigin {
         new Uint32Array(this.fixedBuffer.getMappedRange()).set(fixedData);
         this.fixedBuffer.unmap();
 
-        this.springIndicies = new Uint32Array(this.springs.length * 2);
+        this.springIndices = new Uint32Array(this.springs.length * 2);
         this.springs.forEach((spring, i) => {
             let offset = i * 2;
-            this.springIndicies[offset] = spring.index1;
-            this.springIndicies[offset + 1] = spring.index2;
+            this.springIndices[offset] = spring.index1;
+            this.springIndices[offset + 1] = spring.index2;
         });
 
-        this.springRenderBuffer = makeUInt32ArrayBuffer(this.device, this.springIndicies);
-        this.uvBuffer = makeFloat32ArrayBuffer(this.device, this.mesh);
+        this.springRenderBuffer = makeUInt32IndexArrayBuffer(this.device, this.springIndices);        
         this.uvBuffer = makeFloat32ArrayBuffer(this.device, this.uv);
 
         this.triangleRenderBuffer = this.device.createBuffer({
-            size: this.triangleIndicies.byteLength,
+            size: this.triangleIndices.byteLength,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true,
         });
-        new Uint32Array(this.triangleRenderBuffer.getMappedRange()).set(this.triangleIndicies);
+        new Uint32Array(this.triangleRenderBuffer.getMappedRange()).set(this.triangleIndices);
         this.triangleRenderBuffer.unmap();
 
         const springCalcData = new Float32Array(this.springs.length * 7); // 7 elements per spring
@@ -927,6 +980,32 @@ export class ClothRenderer extends RendererOrigin {
             ]
         });
 
+        this.sphereBindGroup = this.device.createBindGroup({
+            layout: bindGroupLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: this.mvpUniformBuffer
+                    }
+                },
+                {
+                    binding: 1,
+                    resource: this.viewSphere
+                },
+                {
+                    binding: 2,
+                    resource: this.samplerSphere
+                },
+                {
+                    binding: 3,
+                    resource: {
+                        buffer: this.camPosBuffer
+                    }
+                }
+            ]
+        });
+
         const pipelineLayout = this.device.createPipelineLayout({
             bindGroupLayouts: [bindGroupLayout], // Include the bind group layout created above
         });
@@ -1109,30 +1188,44 @@ export class ClothRenderer extends RendererOrigin {
     }
     renderCloth(commandEncoder: GPUCommandEncoder) {
         const passEncoder = commandEncoder.beginRenderPass(this.renderPassDescriptor);
-        // passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
-        // passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer                
-        // passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
-        // passEncoder.draw(this.N * this.M); // Draw the cube using the index count
-
-        // passEncoder.setPipeline(this.springPipeline);
-        // passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        // passEncoder.setIndexBuffer(this.springRenderBuffer, 'uint32'); // 인덱스 포맷 수정
-        // passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
-        // passEncoder.drawIndexed(this.springIndicies.length);
-
         this.device.queue.writeBuffer(
             this.camPosBuffer,
             0,
             new Float32Array([...this.camera.position, 1.0]) // vec3 + padding
         );
-
+        
         passEncoder.setPipeline(this.trianglePipeline);
-        passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        passEncoder.setVertexBuffer(1, this.uvBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        passEncoder.setVertexBuffer(2, this.vertexNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        passEncoder.setIndexBuffer(this.triangleRenderBuffer, 'uint32'); // 인덱스 포맷 수정
-        passEncoder.setBindGroup(0, this.triangleBindGroup); // Set the bind group with MVP matrix
-        passEncoder.drawIndexed(this.triangleIndicies.length);
+        passEncoder.setVertexBuffer(0, this.spherePosBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        passEncoder.setVertexBuffer(1, this.sphereUVBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        passEncoder.setVertexBuffer(2, this.sphereNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        passEncoder.setIndexBuffer(this.sphereIndexBuffer, 'uint32'); // 인덱스 포맷 수정
+        passEncoder.setBindGroup(0, this.sphereBindGroup); // Set the bind group with MVP matrix
+        passEncoder.drawIndexed(this.sphereIndicesLength);
+
+
+        if(this.renderOptions.wireFrame){
+            passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
+            passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer                
+            passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
+            passEncoder.draw(this.N * this.M); // Draw the cube using the index count
+    
+            passEncoder.setPipeline(this.springPipeline);
+            passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+            passEncoder.setIndexBuffer(this.springRenderBuffer, 'uint32'); // 인덱스 포맷 수정
+            passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
+            passEncoder.drawIndexed(this.springIndices.length);
+        }
+        else{
+            passEncoder.setPipeline(this.trianglePipeline);
+            passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+            passEncoder.setVertexBuffer(1, this.uvBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+            passEncoder.setVertexBuffer(2, this.vertexNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+            passEncoder.setIndexBuffer(this.triangleRenderBuffer, 'uint32'); // 인덱스 포맷 수정
+            passEncoder.setBindGroup(0, this.triangleBindGroup); // Set the bind group with MVP matrix
+            passEncoder.drawIndexed(this.triangleIndices.length);
+        }
+
+
 
         passEncoder.end();
     }

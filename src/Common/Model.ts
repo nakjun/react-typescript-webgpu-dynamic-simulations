@@ -1,3 +1,5 @@
+import { vec3 } from "gl-matrix";
+
 export class Model {
     // Cube vertex positions (a simple cube centered at the origin)
     cubeVertices = new Float32Array([
@@ -60,4 +62,48 @@ export class Model {
         return this.cubeIndices;
     }
 
+    createSphere(radius:number, segments:number, position:vec3) {
+        const vertices = [];
+        const uvs = []; 
+        const indices = [];        
+        const normals = [];
+    
+        for (let lat = 0; lat <= segments; lat++) {
+            const theta = lat * Math.PI / segments;
+            const sinTheta = Math.sin(theta);
+            const cosTheta = Math.cos(theta);
+    
+            for (let lon = 0; lon <= segments; lon++) {
+                const phi = lon * 2 * Math.PI / segments;
+                const sinPhi = Math.sin(phi);
+                const cosPhi = Math.cos(phi);
+    
+                const x = cosPhi * sinTheta;
+                const y = cosTheta;
+                const z = sinPhi * sinTheta;
+                const u = 0.25 - (lon / segments);
+                const v = 0.5 - (lat / segments);
+
+                const nx = x;
+                const ny = y;
+                const nz = z;
+                normals.push(nx, ny, nz); // 법선은 이미 정규화된 상태
+    
+                vertices.push(radius * x + position[0], radius * y+ position[1], radius * z+ position[2]);
+                uvs.push(u, v);
+            }
+        }
+    
+        for (let lat = 0; lat < segments; lat++) {
+            for (let lon = 0; lon < segments; lon++) {
+                const first = (lat * (segments + 1)) + lon;
+                const second = first + segments + 1;
+    
+                indices.push(first, second, first + 1);
+                indices.push(second, second + 1, first + 1);
+            }
+        }
+    
+        return { vertices, uvs, indices, normals };
+    }
 }

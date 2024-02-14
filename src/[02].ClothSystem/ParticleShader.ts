@@ -159,13 +159,29 @@ export class ParticleShader {
         var vel = getVelocity(index);
         var f = getForce(index);        
         
+        // floor collisions
         if(pos.y < 0.0){
             pos.y += 0.0001;  
-            vel *= -0.33;      
+            vel *= -0.001;      
+        }
+
+        // Sphere properties
+        var sphereCenter: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0); // Example sphere center
+        var sphereRadius: f32 = 10.0; // Example sphere radius
+
+        // Collision detection and response
+        var distanceToSphereCenter = distance(pos, sphereCenter);
+        if(distanceToSphereCenter < sphereRadius){
+            // Move the particle to the surface of the sphere
+            var directionToCenter = normalize(sphereCenter - pos);
+            pos += (-directionToCenter * 0.1);
+
+            // Reflect velocity
+            vel *= -0.001;      
         }
         
         var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);
-        var deltaTime: f32 = 0.0005; // Assuming 60 FPS for simplicity
+        var deltaTime: f32 = 0.0007; // Assuming 60 FPS for simplicity
 
         vel += ((f + gravity) * deltaTime);
         pos += (vel * deltaTime);

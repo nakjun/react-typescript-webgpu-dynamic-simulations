@@ -1,7 +1,7 @@
 import { mat4, vec3 } from 'gl-matrix';
 import { Camera } from './WebGPU/Camera';
 import { Shader } from './[01].ParticleSystem/Shader';
-import { Model } from './[00].Cube/Model';
+import { Model } from './Common/Model';
 import { SystemGUI } from './GUI/GUI';
 
 export class RendererOrigin {
@@ -18,7 +18,7 @@ export class RendererOrigin {
 
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(60.0, 15.0, 12.0);
+    camera_position: vec3 = vec3.fromValues(50.0, 26.0, -57.0);
     camera_target: vec3 = vec3.fromValues(0.0, 0.0, 0.0);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
@@ -32,6 +32,10 @@ export class RendererOrigin {
         fps: 0,
         ms:""
     };
+
+    renderOptions = {
+        wireFrame: false,
+    }
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -50,6 +54,9 @@ export class RendererOrigin {
         this.systemGUI = new SystemGUI();        
         this.systemGUI.performanceGui.add(this.stats, 'ms').name('ms').listen();
         this.systemGUI.performanceGui.add(this.stats, 'fps').name('fps').listen();
+
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'wireFrame').name('WireFrame');
+
     }
 
     async init() {
