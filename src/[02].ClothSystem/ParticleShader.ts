@@ -27,7 +27,7 @@ export class ParticleShader {
 
         @fragment
         fn fs_main(in: FragmentOutput) -> @location(0) vec4<f32> {
-            let lightDir = normalize(vec3<f32>(0.0, 0.0, -1.0));
+            let lightDir = normalize(vec3<f32>(0.0, 20.0, -1.0));
             let ambient = 0.1;
             let lighting = ambient + (1.0 - ambient); 
             let color = vec3<f32>(in.Color.xyz);
@@ -63,7 +63,7 @@ export class ParticleShader {
 
         @fragment
         fn fs_main(in: FragmentOutput) -> @location(0) vec4<f32> {
-            let lightDir = normalize(vec3<f32>(0.0, 0.0, -1.0));
+            let lightDir = normalize(vec3<f32>(0.0, 20.0, 5.0));
             let ambient = 0.1;
             let lighting = ambient + (1.0 - ambient); 
             let color = vec3<f32>(in.Color.xyz);
@@ -99,31 +99,61 @@ export class ParticleShader {
         return output;
     }
     
+    // @fragment
+    // fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {
+
+    //     let lightColor = vec4<f32>(0.95, 0.95, 0.9, 1.0);
+
+    //     var shininess = 15.0;
+
+    //     let lightDir = normalize(vec3<f32>(0.0, 0.0, 1.0)); // 빛의 방향
+    //     let viewDir = normalize(cameraPos - FragPos); // 뷰(카메라) 방향
+    //     let reflectDir = reflect(-lightDir, Normal); // 반사된 빛의 방향
+    //     let spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); // specular 강도 계산
+    //     let diff = max(dot(Normal, lightDir), 0.2); // Lambertian 반사율
+    //     let ambient = 1.0; // 주변광 설정
+    //     let texColor = textureSample(myTexture, mySampler, TexCoord);
+    //     let color = texColor * (diff + spec + ambient); // 텍스처 색상에 라이팅 적용
+    //     let finalColor = texColor * lightColor * (diff + spec + ambient);
+    //     return vec4(finalColor.rgb, 1.0);
+    // }
+
     @fragment
     fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {
-    // let lightDir = normalize(vec3<f32>(0.0, 0.0, 1.0)); // 빛의 방향
-    // let diff = max(dot(Normal, lightDir), 1.0); // Lambertian 반사율
-    // let texColor = textureSample(myTexture, mySampler, TexCoord);
-    // return texColor * diff; // 텍스처 색상에 따른 라이팅 적용
-    //return texColor;
+        let lightPos = vec3<f32>(0.0,50.0,0.0); // 가정: 빛의 위치
+        let lightColor = vec4<f32>(0.95, 0.95, 0.9, 1.0); // 빛의 색상
+        let ambientColor = vec4<f32>(0.85, 0.85, 0.85, 1.0); // 주변광 색상
+    
+        // 재질 속성
+        let materialAmbient = 0.8;
+        let materialDiffuse = 0.55;
+        let materialSpecular = 0.75;
+        let shininess = 64.0;
+    
+        // Ambient
+        let ambient = ambientColor * materialAmbient;
+    
+        // Diffuse
+        let norm = normalize(Normal);
+        let lightDir = normalize(lightPos - FragPos);
+        let diff = max(dot(norm, lightDir), 0.0);
+        let diffuse = lightColor * (diff * materialDiffuse);
+    
+        // Specular
+        let viewDir = normalize(cameraPos - FragPos);
+        let reflectDir = reflect(-lightDir, norm);
+        let spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+        let specular = lightColor * (spec * materialSpecular);
+    
+        // 텍스처 색상과 조명을 결합
+        let texColor = textureSample(myTexture, mySampler, TexCoord);
+        let finalColor = texColor * (ambient + diffuse + specular);
+        
+        //return vec4(1.0, 1.0, 1.0, 1.0);
+        return vec4(finalColor.x, finalColor.y, finalColor.z, 1.0);
+    }
+    
 
-    let lightColor = vec4<f32>(0.95, 0.95, 0.9, 1.0);
-
-    var shininess = 15.0;
-
-    let lightDir = normalize(vec3<f32>(0.0, 0.0, 1.0)); // 빛의 방향
-    let viewDir = normalize(cameraPos - FragPos); // 뷰(카메라) 방향
-    let reflectDir = reflect(-lightDir, Normal); // 반사된 빛의 방향
-    let spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); // specular 강도 계산
-    let diff = max(dot(Normal, lightDir), 0.2); // Lambertian 반사율
-    let ambient = 1.0; // 주변광 설정
-    let texColor = textureSample(myTexture, mySampler, TexCoord);
-    let color = texColor * (diff + spec + ambient); // 텍스처 색상에 라이팅 적용
-    let finalColor = texColor * lightColor * (diff + spec + ambient);
-    return vec4(finalColor.rgb, 1.0);
-    //return vec4(color.rgb, 1.0); // 알파 값은 1로 설정
-
-}
     `;
 
     freefallComputeShader = `
@@ -174,7 +204,7 @@ export class ParticleShader {
         if(distanceToSphereCenter < sphereRadius){
             // Move the particle to the surface of the sphere
             var directionToCenter = normalize(sphereCenter - pos);
-            pos += (-directionToCenter * 0.1);
+            pos += (-directionToCenter * 0.01);
 
             // Reflect velocity
             vel *= -0.001;      
