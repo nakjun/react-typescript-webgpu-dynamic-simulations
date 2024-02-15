@@ -119,39 +119,52 @@ export class ParticleShader {
     // }
 
     @fragment
-    fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {
-        let lightPos = vec3<f32>(0.0,50.0,0.0); // 가정: 빛의 위치
-        let lightColor = vec4<f32>(0.95, 0.95, 0.9, 1.0); // 빛의 색상
-        let ambientColor = vec4<f32>(0.85, 0.85, 0.85, 1.0); // 주변광 색상
-    
-        // 재질 속성
-        let materialAmbient = 0.8;
-        let materialDiffuse = 0.55;
-        let materialSpecular = 0.75;
-        let shininess = 64.0;
-    
-        // Ambient
-        let ambient = ambientColor * materialAmbient;
-    
-        // Diffuse
-        let norm = normalize(Normal);
-        let lightDir = normalize(lightPos - FragPos);
-        let diff = max(dot(norm, lightDir), 0.0);
-        let diffuse = lightColor * (diff * materialDiffuse);
-    
-        // Specular
-        let viewDir = normalize(cameraPos - FragPos);
-        let reflectDir = reflect(-lightDir, norm);
-        let spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
-        let specular = lightColor * (spec * materialSpecular);
-    
-        // 텍스처 색상과 조명을 결합
-        let texColor = textureSample(myTexture, mySampler, TexCoord);
-        let finalColor = texColor * (ambient + diffuse + specular);
-        
-        //return vec4(1.0, 1.0, 1.0, 1.0);
-        return vec4(finalColor.x, finalColor.y, finalColor.z, 1.0);
+    fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {    
+        var ambientColor: vec4<f32> = vec4<f32>(0.1, 0.1, 0.1, 1.0);
+        var finalColor: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+
+        // 조명 설정 예시
+        var lights: array<vec3<f32>, 4> = array<vec3<f32>, 4>(
+            vec3<f32>(-10.0, 50.0, 10.0), // 조명 1의 위치
+            vec3<f32>(10.0, 50.0, 10.0), // 조명 2의 위치
+            vec3<f32>(-10.0, 50.0, -10.0), // 조명 3의 위치
+            vec3<f32>(10.0, 50.0, -10.0) // 조명 4의 위치
+        );
+
+        let shininess: f32 = 128.0;
+        let lightColor: vec4<f32> = vec4<f32>(0.95, 0.95, 0.9, 1.0);
+
+        // 텍스처 샘플링
+        let texColor: vec4<f32> = textureSample(myTexture, mySampler, TexCoord);
+
+        var shadowFactor: f32 = 1.0;
+
+        // 모든 조명에 대해 반복
+        for (var i: i32 = 0; i < 2; i = i + 1) {
+            let lightPos: vec3<f32> = lights[i];
+            let norm: vec3<f32> = normalize(Normal);
+            let lightDir: vec3<f32> = normalize(lightPos - FragPos);
+            let diff: f32 = max(dot(norm, lightDir), 0.0);
+
+            
+            let specularStrength: f32 = 0.5;
+            
+            let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
+            let reflectDir: vec3<f32> = reflect(-lightDir, norm);
+            let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+            
+            var shadowValue = dot(viewDir, lightDir);
+            let ambient: vec4<f32> = ambientColor * texColor;
+            let diffuse: vec4<f32> = (lightColor * diff * texColor) * shadowFactor;
+            let specular: vec4<f32> = lightColor * spec * specularStrength * shadowFactor;
+
+            finalColor += ambient + diffuse + specular;
+        }
+
+        return finalColor;
+
     }
+
     
 
     `;
@@ -190,10 +203,10 @@ export class ParticleShader {
         var f = getForce(index);        
         
         // floor collisions
-        if(pos.y < 0.0){
-            pos.y += 0.0001;  
-            vel *= -0.001;      
-        }
+        // if(pos.y < 0.0){
+        //     pos.y += 0.0001;  
+        //     vel *= -0.001;      
+        // }
 
         // Sphere properties
         var sphereCenter: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0); // Example sphere center

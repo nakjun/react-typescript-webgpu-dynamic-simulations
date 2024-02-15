@@ -182,7 +182,7 @@ export class ClothRenderer extends RendererOrigin {
         return texture;
     }    
     async createAssets() {
-        const assets1 = await this.createTextureFromImage("./textures/cg_logo.png", this.device);
+        const assets1 = await this.createTextureFromImage("./textures/high_jean.jpg", this.device);
         this.texture = assets1.texture;
         this.sampler = assets1.sampler;
         this.view = assets1.view;
@@ -402,9 +402,9 @@ export class ClothRenderer extends RendererOrigin {
         this.triangleIndices = new Uint32Array(indices);
 
         //first line fix
-        // for (let i = 0; i < this.N; i++) {
-        //     this.particles[i].fixed = true;
-        // }
+        for (let i = 0; i < this.N; i++) {
+            this.particles[i].fixed = true;
+        }
         // for (let i = 0; i < this.N / 3; i++) {
         //     this.particles[i].fixed = true;
         // }

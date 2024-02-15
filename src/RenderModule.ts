@@ -75,7 +75,7 @@ export const Initialize = async () => {
     //sceneManager.createClothModel(256, 256, 5000.0, 1550.0, 100000.0, 0.1);
     //sceneManager.createClothModel(400, 400, 4000.0, 3500.0, 5500.0, 0.1);
     sceneManager.createSphereModel();  
-    sceneManager.createClothModel(512, 512, 4000.0, 2500.0, 25000.0, 0.001);
+    sceneManager.createClothModel(512, 512, 10000.0, 5600.0, 75000.0, 0.001);
     //sceneManager.createClothModel(750, 750, 7000.0, 5000.0, 20000.0, 0.03);
     //sceneManager.createClothModel(850, 850, 15000.0, 9500.0, 70000.0, 0.001);
     sceneManager.createClothBuffers();    
