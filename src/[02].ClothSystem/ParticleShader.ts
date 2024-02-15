@@ -203,10 +203,10 @@ export class ParticleShader {
         var f = getForce(index);        
         
         // floor collisions
-        // if(pos.y < 0.0){
-        //     pos.y += 0.0001;  
-        //     vel *= -0.001;      
-        // }
+        if(pos.y < 0.0){
+            pos.y += 0.0001;  
+            vel *= -0.001;      
+        }
 
         // Sphere properties
         var sphereCenter: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0); // Example sphere center
