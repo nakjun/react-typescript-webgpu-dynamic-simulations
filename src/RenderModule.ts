@@ -35,13 +35,13 @@ export const Initialize = async () => {
     }
     lastMouseX = event.clientX;
     lastMouseY = event.clientY;
-    
+
   });
 
   document.addEventListener('mouseup', (event) => {
     isLeftMouseDown = false;
     isRightMouseDown = false;
-});
+  });
 
 
 
@@ -50,35 +50,37 @@ export const Initialize = async () => {
 
     canvas.addEventListener('mousemove', (event) => {
       if (isLeftMouseDown) {
-          // 카메라 회전 로직 구현
-          const dx = event.clientX - lastMouseX;
-          const dy = event.clientY - lastMouseY;
-          //console.log("rotate");
-          sceneManager.rotateCamera(dx, dy);
-  
+        // 카메라 회전 로직 구현
+        const dx = event.clientX - lastMouseX;
+        const dy = event.clientY - lastMouseY;
+        //console.log("rotate");
+        sceneManager.rotateCamera(dx, dy);
+
       } else if (isRightMouseDown) {
-          // 카메라 패닝 로직 구현
-          const dx = event.clientX - lastMouseX;
-          const dy = event.clientY - lastMouseY;
-          console.log("pan");
+        // 카메라 패닝 로직 구현
+        const dx = event.clientX - lastMouseX;
+        const dy = event.clientY - lastMouseY;
+
+        // 패닝 로직 실행
+        sceneManager.panCamera(dx, dy);
       }
       lastMouseX = event.clientX;
       lastMouseY = event.clientY;
-  });
-  
-  canvas.addEventListener('wheel', (event) => {
+    });
+
+    canvas.addEventListener('wheel', (event) => {
       // 카메라 줌 인/아웃 로직 구현
-      sceneManager.zoomCamera(event.deltaY / 100);      
-  });
+      sceneManager.zoomCamera(event.deltaY / 100);
+    });
     //sceneManager.createClothModel(4, 4, 200.0, 150.0, 1000.0, 0.5);  
     //sceneManager.createClothModel(16, 16, 500.0, 250.0, 1500.0, 0.3);
     sceneManager.createClothModel(256, 256, 5000.0, 1550.0, 100000.0, 0.1);
     //sceneManager.createClothModel(400, 400, 4000.0, 3500.0, 5500.0, 0.1);
-    sceneManager.createSphereModel();  
+    sceneManager.createSphereModel();
     //sceneManager.createClothModel(512, 512, 15000.0, 1000.0, 95000.0, 0.001);
     //sceneManager.createClothModel(750, 750, 7000.0, 5000.0, 20000.0, 0.03);
     //sceneManager.createClothModel(850, 850, 15000.0, 9500.0, 70000.0, 0.001);
-    sceneManager.createClothBuffers();    
+    sceneManager.createClothBuffers();
     sceneManager.createRenderPipeline();
     sceneManager.createSpringPipeline();
     sceneManager.createTrianglePipeline();
@@ -91,7 +93,7 @@ export const Initialize = async () => {
   });
 
   // Create an animation loop function
-  function animate() {    
+  function animate() {
     sceneManager.render();
     requestAnimationFrame(animate);
   }
