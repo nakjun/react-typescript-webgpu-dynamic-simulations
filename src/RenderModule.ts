@@ -1,19 +1,27 @@
 import { Renderer } from "./[01].ParticleSystem/Renderer";
 import { ClothRenderer } from "./[02].ClothSystem/Renderer";
+import { ObjModel, ObjLoader } from "./Common/ObjLoader";
 
+const startParticleSimulation = async () => {
+  const sceneManager = new Renderer("gfx-main");
+  sceneManager.init().then(() => {
+    sceneManager.createBuffers();
+    sceneManager.createPipeline();
+    sceneManager.createParticles(100000);
+    sceneManager.createParticleBuffers();
+    sceneManager.createParticlePipeline();
+    sceneManager.createComputePipeline();
+    sceneManager.createComputeBindGroup();
+    animate();
+  });
 
-export const Initialize = async () => {
-  // const sceneManager = new Renderer("gfx-main");
-  // sceneManager.init().then(() => {   
-  //   sceneManager.createBuffers();
-  //   sceneManager.createPipeline();
-  //   sceneManager.createParticles(100000);
-  //   sceneManager.createParticleBuffers();
-  //   sceneManager.createParticlePipeline();
-  //   sceneManager.createComputePipeline();
-  //   sceneManager.createComputeBindGroup();
-  //   animate();
-  // });
+  function animate() {
+    sceneManager.render();
+    requestAnimationFrame(animate);
+  }
+}
+
+const startClothSimluation = async () => {
 
   const canvas = document.querySelector("canvas#gfx-main") as HTMLCanvasElement; // `as HTMLCanvasElement`로 타입 단언 사용
   if (!canvas) {
@@ -97,4 +105,24 @@ export const Initialize = async () => {
     sceneManager.render();
     requestAnimationFrame(animate);
   }
+}
+
+export const Initialize = async () => {
+
+  var isCloth: boolean = true;
+
+  if (!isCloth) {
+    await startParticleSimulation();
+  } else {
+
+    const loader = new ObjLoader();
+    loader.load('./objects/bunny.obj').then(model => {
+      console.log(model.vertices.length, model.indices.length, model.normals.length);
+    });
+
+    await startClothSimluation();
+  }
+
+
+
 }
