@@ -2,22 +2,23 @@ export class ObjModel {
     vertices: number[] = [];
     indices: number[] = [];
     normals: number[] = [];
+    uvs: number[] = []; // UVs 배열 추가
 }
 
 export class ObjLoader {
-    parse(objData: string): ObjModel {
-        const model = new ObjModel();
+    model: ObjModel = new ObjModel();
+    parse(objData: string, scale: number = 1.0): ObjModel {
+        var _model = new ObjModel();
         const vertexPositions: number[][] = [];
         const vertexNormals: number[][] = [];
-        const tempNormals: number[][] = [];
         const faces: string[][] = [];
 
         objData.split('\n').forEach(line => {
             const parts = line.trim().split(/\s+/);
             switch (parts[0]) {
                 case 'v':
-                    vertexPositions.push(parts.slice(1).map(parseFloat));
-                    tempNormals.push([0, 0, 0]); // 임시 법선 배열 초기화
+                    const scaledPosition = parts.slice(1).map(parseFloat).map(coord => coord * scale);
+                    vertexPositions.push(scaledPosition);
                     break;
                 case 'vn':
                     vertexNormals.push(parts.slice(1).map(parseFloat));
@@ -40,11 +41,14 @@ export class ObjLoader {
                     return indexMap.get(key)!;
                 } else {
                     const position = vertexPositions[pos];
-                    model.vertices.push(...position);
+                    _model.vertices.push(...position);
+
+                    // UVs를 (0, 0)으로 설정
+                    _model.uvs.push(0, 0);
 
                     if (vertexNormals.length > 0 && norm !== undefined) {
                         const normal = vertexNormals[norm];
-                        model.normals.push(...normal);
+                        _model.normals.push(...normal);
                     }
 
                     indexMap.set(key, currentIndex);
@@ -53,28 +57,31 @@ export class ObjLoader {
             });
 
             for (let i = 1; i < faceIndices.length - 1; i++) {
-                model.indices.push(faceIndices[0], faceIndices[i], faceIndices[i + 1]);
+                _model.indices.push(faceIndices[0], faceIndices[i], faceIndices[i + 1]);
             }
         });
 
+        // 정점 법선이 없는 경우 계산
         if (vertexNormals.length === 0) {
-            this.calculateNormals(model.vertices, model.indices).forEach(n => model.normals.push(n));
+            this.calculateNormals(_model.vertices, _model.indices).forEach(n => _model.normals.push(n));
         }
 
-        return model;
+        console.log("parse end");
+
+        return _model;
     }
 
     calculateNormals(vertices: number[], indices: number[]): number[] {
-        const normals = new Array(vertices.length).fill(0);
+        const normals = new Array(vertices.length / 3).fill(0).map(() => [0, 0, 0]);
 
         for (let i = 0; i < indices.length; i += 3) {
-            const i0 = indices[i] * 3;
-            const i1 = indices[i + 1] * 3;
-            const i2 = indices[i + 2] * 3;
+            const i0 = indices[i];
+            const i1 = indices[i + 1];
+            const i2 = indices[i + 2];
 
-            const v1 = vertices.slice(i0, i0 + 3);
-            const v2 = vertices.slice(i1, i1 + 3);
-            const v3 = vertices.slice(i2, i2 + 3);
+            const v1 = vertices.slice(i0 * 3, i0 * 3 + 3);
+            const v2 = vertices.slice(i1 * 3, i1 * 3 + 3);
+            const v3 = vertices.slice(i2 * 3, i2 * 3 + 3);
 
             const u = v2.map((val, idx) => val - v1[idx]);
             const v = v3.map((val, idx) => val - v1[idx]);
@@ -85,26 +92,26 @@ export class ObjLoader {
                 u[0] * v[1] - u[1] * v[0]
             ];
 
-            norm.forEach((value, idx) => {
-                normals[i0 + idx] += value;
-                normals[i1 + idx] += value;
-                normals[i2 + idx] += value;
-            });
+            // 정점별 법선 누적
+            for (let j = 0; j < 3; j++) {
+                normals[i0][j] += norm[j];
+                normals[i1][j] += norm[j];
+                normals[i2][j] += norm[j];
+            }
         }
 
-        for (let i = 0; i < normals.length; i += 3) {
-            const len = Math.sqrt(normals[i] ** 2 + normals[i + 1] ** 2 + normals[i + 2] ** 2);
-            normals[i] /= len;
-            normals[i + 1] /= len;
-            normals[i + 2] /= len;
-        }
+        // 누적된 법선 정규화
+        const normalizedNormals = normals.flatMap(norm => {
+            const len = Math.sqrt(norm[0] ** 2 + norm[1] ** 2 + norm[2] ** 2);
+            return [norm[0] / len, norm[1] / len, norm[2] / len];
+        });
 
-        return normals;
+        return normalizedNormals;
     }
 
-    async load(url: string): Promise<ObjModel> {
+    async load(url: string, scale: number = 1.0): Promise<ObjModel> {
         const response = await fetch(url);
         const objData = await response.text();
-        return this.parse(objData);
+        return this.parse(objData, scale);
     }
 }

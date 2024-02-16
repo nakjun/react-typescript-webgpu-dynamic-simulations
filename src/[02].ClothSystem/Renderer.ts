@@ -8,6 +8,8 @@ import { makeFloat32ArrayBuffer, makeFloat32ArrayBufferStorage, makeUInt32IndexA
 import { Model } from '../Common/Model';
 import { NormalShader } from './NormalShader';
 
+import { ObjLoader, ObjModel } from '../Common/ObjLoader';
+
 export class ClothRenderer extends RendererOrigin {
 
     private particlePipeline!: GPURenderPipeline;
@@ -83,7 +85,7 @@ export class ClothRenderer extends RendererOrigin {
     //cloth information
     N: number = 0;
     M: number = 0;
-    
+
     structuralKs: number = 1000.0;
     shearKs: number = 1000.0;
     bendKs: number = 1000.0;
@@ -104,41 +106,46 @@ export class ClothRenderer extends RendererOrigin {
     private modelGenerator!: Model;
     private sphereRadious!: number;
     private sphereSegments!: number;
-    private spherePosition!: vec3;  
-    private spherePosBuffer!: GPUBuffer;
-    private sphereIndexBuffer!: GPUBuffer;  
-    private sphereUVBuffer!: GPUBuffer;
-    private sphereNormalBuffer!: GPUBuffer;
-    private sphereIndicesLength!: number;
-    private sphereBindGroup!: GPUBindGroup;
+    private spherePosition!: vec3;
+    private ObjectPosBuffer!: GPUBuffer;
+    private objectIndexBuffer!: GPUBuffer;
+    private objectUVBuffer!: GPUBuffer;
+    private objectNormalBuffer!: GPUBuffer;
+    private objectIndicesLength!: number;
+    private objectBindGroup!: GPUBindGroup;
 
     //mateirals - sphere
-    private textureSphere!: GPUTexture
-    private viewSphere!: GPUTextureView
-    private samplerSphere!: GPUSampler    
+    private textureObject!: GPUTexture
+    private viewObject!: GPUTextureView
+    private samplerObject!: GPUSampler
+
+    private model!: ObjModel;
 
     /* constructor */
     constructor(canvasId: string) {
         super(canvasId);
         this.particleShader = new ParticleShader();
-        this.springShader = new SpringShader();     
+        this.springShader = new SpringShader();
         this.normalShader = new NormalShader();
-        
-        this.modelGenerator = new Model();             
+
+        this.modelGenerator = new Model();
+        this.model = new ObjModel();
+
     }
 
     /* async functions */
     async init() {
         await super.init();
         await this.createAssets();
+        await this.MakeModelData();
     }
-    async createTextureFromImage(src: string, device: GPUDevice): Promise<{texture: GPUTexture, sampler: GPUSampler, view: GPUTextureView}> {
+    async createTextureFromImage(src: string, device: GPUDevice): Promise<{ texture: GPUTexture, sampler: GPUSampler, view: GPUTextureView }> {
         const response: Response = await fetch(src);
         const blob: Blob = await response.blob();
         const imageData: ImageBitmap = await createImageBitmap(blob);
-    
+
         const texture = await this.loadImageBitmap(device, imageData);
-    
+
         const view = texture.createView({
             format: "rgba8unorm",
             dimension: "2d",
@@ -148,7 +155,7 @@ export class ClothRenderer extends RendererOrigin {
             baseArrayLayer: 0,
             arrayLayerCount: 1
         });
-    
+
         const sampler = device.createSampler({
             addressModeU: "repeat",
             addressModeV: "repeat",
@@ -157,11 +164,11 @@ export class ClothRenderer extends RendererOrigin {
             mipmapFilter: "nearest",
             maxAnisotropy: 1
         });
-    
+
         return { texture, sampler, view };
-    }    
+    }
     async loadImageBitmap(device: GPUDevice, imageData: ImageBitmap): Promise<GPUTexture> {
-    
+
         const textureDescriptor: GPUTextureDescriptor = {
             size: {
                 width: imageData.width,
@@ -170,27 +177,27 @@ export class ClothRenderer extends RendererOrigin {
             format: "rgba8unorm",
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
         };
-    
+
         const texture = device.createTexture(textureDescriptor);
-    
+
         device.queue.copyExternalImageToTexture(
             { source: imageData },
             { texture: texture },
             { width: imageData.width, height: imageData.height }
         );
-    
+
         return texture;
-    }    
+    }
     async createAssets() {
-        const assets1 = await this.createTextureFromImage("./textures/high_jean.jpg", this.device);
+        const assets1 = await this.createTextureFromImage("./textures/siggraph.png", this.device);
         this.texture = assets1.texture;
         this.sampler = assets1.sampler;
         this.view = assets1.view;
-    
+
         const assets2 = await this.createTextureFromImage("./textures/metal.jpg", this.device);
-        this.textureSphere = assets2.texture;
-        this.samplerSphere = assets2.sampler;
-        this.viewSphere = assets2.view;
+        this.textureObject = assets2.texture;
+        this.samplerObject = assets2.sampler;
+        this.viewObject = assets2.view;
     }
     async readBackPositionBuffer() {
 
@@ -216,7 +223,7 @@ export class ClothRenderer extends RendererOrigin {
         const data = new Float32Array(arrayBuffer);
         console.log("----");
         for (let i = 0; i < data.length; i += 3) {
-            console.log('[', i/3 , ']vec3 Array:', [data[i], data[i + 1], data[i + 2]]);
+            console.log('[', i / 3, ']vec3 Array:', [data[i], data[i + 1], data[i + 2]]);
         }
         // var res = JSON.stringify(data, undefined);
         // console.log(res);
@@ -226,7 +233,7 @@ export class ClothRenderer extends RendererOrigin {
         readBackBuffer.destroy();
     }
     async render() {
-        const currentTime = performance.now();        
+        const currentTime = performance.now();
         this.localFrameCount++;
 
         this.setCamera(this.camera);
@@ -237,7 +244,7 @@ export class ClothRenderer extends RendererOrigin {
         //compute pass
         this.InitNodeForce(commandEncoder);
         this.updateSprings(commandEncoder);
-        this.summationNodeForce(commandEncoder);                
+        this.summationNodeForce(commandEncoder);
 
         this.updateParticles(commandEncoder);
         this.updateNormals(commandEncoder);
@@ -259,31 +266,49 @@ export class ClothRenderer extends RendererOrigin {
 
         this.lastTime = currentTime;
     }
-    
+
     /* Create Data */
-    createSphereModel(){
+    createSphereModel() {
         this.sphereRadious = 10.0;
         this.sphereSegments = 64;
-        this.spherePosition = vec3.fromValues(0.0,0.0,0.0);
+        this.spherePosition = vec3.fromValues(0.0, 0.0, 0.0);
         var sphere = this.modelGenerator.createSphere(this.sphereRadious, this.sphereSegments, this.spherePosition);
-
         var vertArray = new Float32Array(sphere.vertices);
         var indArray = new Uint32Array(sphere.indices);
         var uvArray = new Float32Array(sphere.uvs);
         var normalArray = new Float32Array(sphere.normals);
+        this.objectIndicesLength = sphere.indices.length;
 
-        this.sphereIndicesLength = sphere.indices.length;
-
-        //console.log(vertArray, indArray, uvArray);
-
-        this.spherePosBuffer = makeFloat32ArrayBufferStorage(this.device, vertArray);
-        this.sphereIndexBuffer = makeUInt32IndexArrayBuffer(this.device, indArray);        
-        this.sphereUVBuffer = makeFloat32ArrayBufferStorage(this.device, uvArray);
-        this.sphereNormalBuffer = makeFloat32ArrayBufferStorage(this.device, normalArray);
-        
-        
+        this.ObjectPosBuffer = makeFloat32ArrayBufferStorage(this.device, vertArray);
+        this.objectIndexBuffer = makeUInt32IndexArrayBuffer(this.device, indArray);
+        this.objectUVBuffer = makeFloat32ArrayBufferStorage(this.device, uvArray);
+        this.objectNormalBuffer = makeFloat32ArrayBufferStorage(this.device, normalArray);
     }
-    createClothModel(x: number, y: number, structuralKs:number=5000.0, shearKs:number=2000.0, bendKs:number=500.0, kd:number=0.25) {
+
+    async MakeModelData() {
+        const loader = new ObjLoader();
+
+        //this.model = await loader.load('./objects/bunny.obj', 150.0);
+        this.model = await loader.load('./objects/armadillo.obj', 30.0);
+        this.model = await loader.load('./objects/dragon.obj', 2.0);
+
+        console.log("load end");
+
+        console.log(this.model.vertices, this.model.indices, this.model.uvs, this.model.normals);
+        var vertArray = new Float32Array(this.model.vertices);
+        var indArray = new Uint32Array(this.model.indices);
+        var normalArray = new Float32Array(this.model.normals);
+        var uvArray = new Float32Array(this.model.uvs);
+        this.objectIndicesLength = this.model.indices.length;
+
+        // 여기서부터는 dragonModel의 데이터가 모두 준비되었으므로, 버퍼 생성 등의 로직을 실행합니다.
+        this.ObjectPosBuffer = makeFloat32ArrayBufferStorage(this.device, vertArray);
+        this.objectIndexBuffer = makeUInt32IndexArrayBuffer(this.device, indArray);
+        this.objectUVBuffer = makeFloat32ArrayBufferStorage(this.device, uvArray);
+        this.objectNormalBuffer = makeFloat32ArrayBufferStorage(this.device, normalArray);
+    }
+
+    createClothModel(x: number, y: number, structuralKs: number = 5000.0, shearKs: number = 2000.0, bendKs: number = 500.0, kd: number = 0.25) {
 
         this.N = x;
         this.M = y;
@@ -371,7 +396,7 @@ export class ClothRenderer extends RendererOrigin {
                 this.particles[topRight].triangles.push(triangle2);
                 this.particles[bottomLeft].triangles.push(triangle2);
                 this.particles[bottomRight].triangles.push(triangle2);
-                
+
                 indices.push(topLeft, bottomLeft, topRight);
                 indices.push(topRight, bottomLeft, bottomRight);
 
@@ -396,9 +421,9 @@ export class ClothRenderer extends RendererOrigin {
             }
         }
         this.normals.forEach(normal => {
-            vec3.normalize(normal, normal);            
+            vec3.normalize(normal, normal);
         });
-        
+
         this.triangleIndices = new Uint32Array(indices);
 
         //first line fix
@@ -418,12 +443,12 @@ export class ClothRenderer extends RendererOrigin {
         this.numParticles = this.particles.length;
         console.log("create node success");
         for (let i = 0; i < this.particles.length; i++) {
-            let nConnectedTriangle = this.particles[i].triangles.length;            
+            let nConnectedTriangle = this.particles[i].triangles.length;
             this.maxTriangleConnected = Math.max(this.maxTriangleConnected, nConnectedTriangle);
         }
         console.log(this.maxTriangleConnected);
 
-        for(let i =0;i<this.triangles.length;i++){
+        for (let i = 0; i < this.triangles.length; i++) {
             var triangle = this.triangles[i];
 
             triangle.targetIndex1 += (this.maxTriangleConnected * triangle.v1);
@@ -613,8 +638,8 @@ export class ClothRenderer extends RendererOrigin {
             this.springIndices[offset + 1] = spring.index2;
         });
 
-        this.springRenderBuffer = makeUInt32IndexArrayBuffer(this.device, this.springIndices);        
-        
+        this.springRenderBuffer = makeUInt32IndexArrayBuffer(this.device, this.springIndices);
+
         this.uvBuffer = makeFloat32ArrayBuffer(this.device, this.uv);
 
         this.triangleRenderBuffer = this.device.createBuffer({
@@ -644,7 +669,7 @@ export class ClothRenderer extends RendererOrigin {
         });
         new Float32Array(this.springCalculationBuffer.getMappedRange()).set(springCalcData);
         this.springCalculationBuffer.unmap();
-        
+
         const triangleCalcData = new Float32Array(this.triangles.length * 6); // 7 elements per spring
         this.triangles.forEach((triangle, i) => {
             let offset = i * 6;
@@ -691,7 +716,7 @@ export class ClothRenderer extends RendererOrigin {
         this.tempTriangleNormalBuffer.unmap();
 
         var size_temp = this.numParticles * this.maxTriangleConnected * 3;
-        console.log("asd", size_temp*4, this.tempTriangleNormalBuffer.size);
+        console.log("asd", size_temp * 4, this.tempTriangleNormalBuffer.size);
 
         this.camPosBuffer = this.device.createBuffer({
             size: 4 * Float32Array.BYTES_PER_ELEMENT, // vec3<f32> + padding
@@ -1026,8 +1051,8 @@ export class ClothRenderer extends RendererOrigin {
                 }
             ],
         });
-    }    
-    createUpdateNormalPipeline(){
+    }
+    createUpdateNormalPipeline() {
         const normalComputeShaderModule = this.device.createShaderModule({ code: this.normalShader.getNormalUpdateComputeShader() });
         {
             const bindGroupLayout = this.device.createBindGroupLayout({
@@ -1354,7 +1379,7 @@ export class ClothRenderer extends RendererOrigin {
             ]
         });
 
-        this.sphereBindGroup = this.device.createBindGroup({
+        this.objectBindGroup = this.device.createBindGroup({
             layout: bindGroupLayout,
             entries: [
                 {
@@ -1365,11 +1390,11 @@ export class ClothRenderer extends RendererOrigin {
                 },
                 {
                     binding: 1,
-                    resource: this.viewSphere
+                    resource: this.viewObject
                 },
                 {
                     binding: 2,
-                    resource: this.samplerSphere
+                    resource: this.samplerObject
                 },
                 {
                     binding: 3,
@@ -1385,7 +1410,7 @@ export class ClothRenderer extends RendererOrigin {
         });
 
         this.trianglePipeline = this.device.createRenderPipeline({
-            layout: pipelineLayout, 
+            layout: pipelineLayout,
             vertex: {
                 module: textureShaderModule,
                 entryPoint: 'vs_main',
@@ -1436,7 +1461,7 @@ export class ClothRenderer extends RendererOrigin {
             },
         });
     }
-    
+
     /* Update Routine */
     updateSprings(commandEncoder: GPUCommandEncoder) {
         const computePass = commandEncoder.beginComputePass();
@@ -1493,29 +1518,29 @@ export class ClothRenderer extends RendererOrigin {
             0,
             new Float32Array([...this.camera.position, 1.0]) // vec3 + padding
         );
-        
+
         passEncoder.setPipeline(this.trianglePipeline);
-        passEncoder.setVertexBuffer(0, this.spherePosBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        passEncoder.setVertexBuffer(1, this.sphereUVBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        passEncoder.setVertexBuffer(2, this.sphereNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        passEncoder.setIndexBuffer(this.sphereIndexBuffer, 'uint32'); // 인덱스 포맷 수정
-        passEncoder.setBindGroup(0, this.sphereBindGroup); // Set the bind group with MVP matrix
-        passEncoder.drawIndexed(this.sphereIndicesLength);
+        passEncoder.setVertexBuffer(0, this.ObjectPosBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        passEncoder.setVertexBuffer(1, this.objectUVBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        passEncoder.setVertexBuffer(2, this.objectNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        passEncoder.setIndexBuffer(this.objectIndexBuffer, 'uint32'); // 인덱스 포맷 수정
+        passEncoder.setBindGroup(0, this.objectBindGroup); // Set the bind group with MVP matrix
+        passEncoder.drawIndexed(this.objectIndicesLength);
+        console.log(this.objectIndicesLength);
 
-
-        if(this.renderOptions.wireFrame){
+        if (this.renderOptions.wireFrame) {
             passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
             passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer                
             passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
             passEncoder.draw(this.N * this.M); // Draw the cube using the index count
-    
+
             passEncoder.setPipeline(this.springPipeline);
             passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
             passEncoder.setIndexBuffer(this.springRenderBuffer, 'uint32'); // 인덱스 포맷 수정
             passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
             passEncoder.drawIndexed(this.springIndices.length);
         }
-        else{
+        else {
             passEncoder.setPipeline(this.trianglePipeline);
             passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
             passEncoder.setVertexBuffer(1, this.uvBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
@@ -1529,7 +1554,7 @@ export class ClothRenderer extends RendererOrigin {
 
         passEncoder.end();
     }
-    
+
     /* Make Metadata */
     makeRenderpassDescriptor() {
         this.renderPassDescriptor = {
@@ -1546,5 +1571,5 @@ export class ClothRenderer extends RendererOrigin {
                 depthStoreOp: 'store',
             }
         };
-    }    
+    }
 }

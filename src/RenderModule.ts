@@ -84,7 +84,7 @@ const startClothSimluation = async () => {
     //sceneManager.createClothModel(16, 16, 500.0, 250.0, 1500.0, 0.3);
     sceneManager.createClothModel(256, 256, 5000.0, 1550.0, 100000.0, 0.1);
     //sceneManager.createClothModel(400, 400, 4000.0, 3500.0, 5500.0, 0.1);
-    sceneManager.createSphereModel();
+    //sceneManager.createSphereModel();
     //sceneManager.createClothModel(512, 512, 15000.0, 1000.0, 95000.0, 0.001);
     //sceneManager.createClothModel(750, 750, 7000.0, 5000.0, 20000.0, 0.03);
     //sceneManager.createClothModel(850, 850, 15000.0, 9500.0, 70000.0, 0.001);
@@ -115,10 +115,7 @@ export const Initialize = async () => {
     await startParticleSimulation();
   } else {
 
-    const loader = new ObjLoader();
-    loader.load('./objects/bunny.obj').then(model => {
-      console.log(model.vertices.length, model.indices.length, model.normals.length);
-    });
+
 
     await startClothSimluation();
   }
