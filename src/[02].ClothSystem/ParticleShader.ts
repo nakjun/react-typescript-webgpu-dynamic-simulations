@@ -99,25 +99,6 @@ export class ParticleShader {
         return output;
     }
     
-    // @fragment
-    // fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {
-
-    //     let lightColor = vec4<f32>(0.95, 0.95, 0.9, 1.0);
-
-    //     var shininess = 15.0;
-
-    //     let lightDir = normalize(vec3<f32>(0.0, 0.0, 1.0)); // 빛의 방향
-    //     let viewDir = normalize(cameraPos - FragPos); // 뷰(카메라) 방향
-    //     let reflectDir = reflect(-lightDir, Normal); // 반사된 빛의 방향
-    //     let spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); // specular 강도 계산
-    //     let diff = max(dot(Normal, lightDir), 0.2); // Lambertian 반사율
-    //     let ambient = 1.0; // 주변광 설정
-    //     let texColor = textureSample(myTexture, mySampler, TexCoord);
-    //     let color = texColor * (diff + spec + ambient); // 텍스처 색상에 라이팅 적용
-    //     let finalColor = texColor * lightColor * (diff + spec + ambient);
-    //     return vec4(finalColor.rgb, 1.0);
-    // }
-
     @fragment
     fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {    
         var ambientColor: vec4<f32> = vec4<f32>(0.1, 0.1, 0.1, 1.0);

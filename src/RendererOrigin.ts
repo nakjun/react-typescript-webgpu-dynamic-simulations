@@ -90,6 +90,18 @@ export class RendererOrigin {
             alphaMode: "opaque",
         });
         this.createDepthTexture();
+        this.printDeviceLimits();
+
+    }
+    printDeviceLimits(){
+        const limits:GPUSupportedLimits = this.device.limits;
+
+        console.log("===GPU Device Limits from WebGPU===");
+        console.log("maxComputeWorkgroupSizeX:",limits.maxComputeWorkgroupSizeX);
+        console.log("maxComputeWorkgroupSizeY:",limits.maxComputeWorkgroupSizeY);
+        console.log("maxComputeWorkgroupSizeZ:",limits.maxComputeWorkgroupSizeZ);
+        console.log("maxComputeInvocationsPerWorkgroup:",limits.maxComputeInvocationsPerWorkgroup);
+        console.log("maxComputeWorkgroupsPerDimension:",limits.maxComputeWorkgroupsPerDimension);
     }
 
     createDepthTexture() {

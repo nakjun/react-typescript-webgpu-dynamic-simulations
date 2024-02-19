@@ -25,7 +25,7 @@ export class NormalShader{
         t3: f32,
     }
 
-    @compute @workgroup_size(64)
+    @compute @workgroup_size(256)
     fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let id: u32 = global_id.x;
         if (id >= numTriangles) {

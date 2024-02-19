@@ -44,7 +44,7 @@ export class ObjLoader {
                     _model.vertices.push(...position);
 
                     // UVs를 (0, 0)으로 설정
-                    _model.uvs.push(0, 0);
+                    _model.uvs.push(0.01, 0.01);
 
                     if (vertexNormals.length > 0 && norm !== undefined) {
                         const normal = vertexNormals[norm];

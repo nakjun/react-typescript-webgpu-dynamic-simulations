@@ -9,6 +9,7 @@ import { Model } from '../Common/Model';
 import { NormalShader } from './NormalShader';
 
 import { ObjLoader, ObjModel } from '../Common/ObjLoader';
+import { IntersectionShader } from './IntersectionShader';
 
 export class ClothRenderer extends RendererOrigin {
 
@@ -34,6 +35,9 @@ export class ClothRenderer extends RendererOrigin {
     private computeNodeForceInitPipeline!: GPUComputePipeline;
     private computeNodeForceInitBindGroup!: GPUBindGroup;
 
+    private computeIntersectionPipeline!: GPUComputePipeline;
+    private computeIntersectionBindGroup!: GPUBindGroup;
+
     //uniform buffers
     private numParticlesBuffer!: GPUBuffer;
     private numSpringsBuffer!: GPUBuffer;
@@ -58,6 +62,7 @@ export class ClothRenderer extends RendererOrigin {
     private particleShader!: ParticleShader;
     private springShader!: SpringShader;
     private normalShader!: NormalShader;
+    private interesectionShader!: IntersectionShader;
 
     //particle information
     private particles: Node[] = [];
@@ -102,6 +107,8 @@ export class ClothRenderer extends RendererOrigin {
     maxTriangleConnected: number = 0;
     private tempTriangleNormalBuffer!: GPUBuffer;
 
+    private tempTriangleTriangleCollisionBuffer!: GPUBuffer;
+
     //sphere model
     private modelGenerator!: Model;
     private sphereRadious!: number;
@@ -113,6 +120,7 @@ export class ClothRenderer extends RendererOrigin {
     private objectNormalBuffer!: GPUBuffer;
     private objectIndicesLength!: number;
     private objectBindGroup!: GPUBindGroup;
+    private objectNumTriangleBuffer!: GPUBuffer;
 
     //mateirals - sphere
     private textureObject!: GPUTexture
@@ -127,11 +135,13 @@ export class ClothRenderer extends RendererOrigin {
         this.particleShader = new ParticleShader();
         this.springShader = new SpringShader();
         this.normalShader = new NormalShader();
+        this.interesectionShader = new IntersectionShader();
 
         this.modelGenerator = new Model();
-        this.model = new ObjModel();
-
+        this.model = new ObjModel();     
     }
+
+    
 
     /* async functions */
     async init() {
@@ -194,14 +204,14 @@ export class ClothRenderer extends RendererOrigin {
         this.sampler = assets1.sampler;
         this.view = assets1.view;
 
-        const assets2 = await this.createTextureFromImage("./textures/metal.jpg", this.device);
+        const assets2 = await this.createTextureFromImage("./textures/high_jean.jpg", this.device);
         this.textureObject = assets2.texture;
         this.samplerObject = assets2.sampler;
         this.viewObject = assets2.view;
     }
     async readBackPositionBuffer() {
 
-        var target = this.tempTriangleNormalBuffer;
+        var target = this.tempTriangleTriangleCollisionBuffer;
 
         // Create a GPUBuffer for reading back the data
         const readBackBuffer = this.device.createBuffer({
@@ -246,14 +256,15 @@ export class ClothRenderer extends RendererOrigin {
         this.updateSprings(commandEncoder);
         this.summationNodeForce(commandEncoder);
 
+        this.tritriIntersections(commandEncoder);
+        if(this.localFrameCount > 500 && this.localFrameCount % 50 ===0 && this.frameCount < 1)
+        {
+            await this.readBackPositionBuffer();
+            this.frameCount++;
+        }
         this.updateParticles(commandEncoder);
         this.updateNormals(commandEncoder);
 
-        // if(this.localFrameCount > 500 && this.localFrameCount % 50 ===0 && this.frameCount < 1)
-        // {
-        //     await this.readBackPositionBuffer();
-        //     this.frameCount++;
-        // }
 
         //render pass
         this.renderCloth(commandEncoder);
@@ -288,13 +299,14 @@ export class ClothRenderer extends RendererOrigin {
     async MakeModelData() {
         const loader = new ObjLoader();
 
-        //this.model = await loader.load('./objects/bunny.obj', 150.0);
-        this.model = await loader.load('./objects/armadillo.obj', 30.0);
-        this.model = await loader.load('./objects/dragon.obj', 2.0);
+        this.model = await loader.load('./objects/skybox.obj', 12.0);
+        //this.model = await loader.load('./objects/bunny.obj', 100.0);
+        //this.model = await loader.load('./objects/armadillo.obj', 30.0);
+        //this.model = await loader.load('./objects/dragon.obj', 2.0);
 
-        console.log("load end");
+        console.log("object file load end");
 
-        console.log(this.model.vertices, this.model.indices, this.model.uvs, this.model.normals);
+        //console.log(this.model.vertices, this.model.indices, this.model.uvs, this.model.normals);
         var vertArray = new Float32Array(this.model.vertices);
         var indArray = new Uint32Array(this.model.indices);
         var normalArray = new Float32Array(this.model.normals);
@@ -306,6 +318,108 @@ export class ClothRenderer extends RendererOrigin {
         this.objectIndexBuffer = makeUInt32IndexArrayBuffer(this.device, indArray);
         this.objectUVBuffer = makeFloat32ArrayBufferStorage(this.device, uvArray);
         this.objectNormalBuffer = makeFloat32ArrayBufferStorage(this.device, normalArray);
+
+        const numTriangleData = new Uint32Array([this.model.indices.length / 3]);
+        this.objectNumTriangleBuffer = this.device.createBuffer({
+            size: numTriangleData.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        new Uint32Array(this.objectNumTriangleBuffer.getMappedRange()).set(numTriangleData);
+        this.objectNumTriangleBuffer.unmap();
+    }
+
+    createIntersectionPipeline(){
+        const intersectionComputeShaderModule = this.device.createShaderModule({ code: this.interesectionShader.getIntersectionShader() });
+
+        const bindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: { type: 'storage', minBindingSize: 0, },
+                },
+                {
+                    binding: 1, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: { type: 'storage', minBindingSize: 0, },
+                },
+                {
+                    binding: 2, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: {
+                        type: 'storage',
+                        minBindingSize: 0, // or specify the actual size
+                    },
+                },
+                {
+                    binding: 3, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: { type: 'storage', minBindingSize: 0 }, // Ensure this matches the shader's expectation
+                },
+                {
+                    binding: 4, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: { type: 'uniform', minBindingSize: 4, },
+                },
+                {
+                    binding: 5, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: { type: 'uniform', minBindingSize: 4 }, // Ensure this matches the shader's expectation
+                }
+            ]
+        });
+
+        const tritriConnectedData = new Float32Array(this.triangleIndices.length * this.objectIndicesLength);
+        
+        this.tempTriangleTriangleCollisionBuffer = this.device.createBuffer({
+            size: tritriConnectedData.byteLength,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+            mappedAtCreation: true,
+        });
+        new Float32Array(this.tempTriangleTriangleCollisionBuffer.getMappedRange()).set(tritriConnectedData);
+        this.tempTriangleTriangleCollisionBuffer.unmap();
+
+
+        const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+
+        this.computeIntersectionPipeline = this.device.createComputePipeline({
+            layout: computePipelineLayout,
+            compute: {
+                module: intersectionComputeShaderModule,
+                entryPoint: 'main',
+            },
+        });
+        
+        this.computeIntersectionBindGroup = this.device.createBindGroup({
+            layout: bindGroupLayout, // The layout created earlier
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: this.positionBuffer }
+                },
+                {
+                    binding: 1,
+                    resource: { buffer: this.triangleCalculationBuffer }
+                },
+                {
+                    binding: 2,
+                    resource: { buffer: this.ObjectPosBuffer }
+                },
+                {
+                    binding: 3,
+                    resource: { buffer: this.objectIndexBuffer }
+                },
+                {
+                    binding: 4,
+                    resource: { buffer: this.numTriangleBuffer }
+                },
+                {
+                    binding: 5,
+                    resource: { buffer: this.objectNumTriangleBuffer }
+                }
+            ]
+        });
     }
 
     createClothModel(x: number, y: number, structuralKs: number = 5000.0, shearKs: number = 2000.0, bendKs: number = 500.0, kd: number = 0.25) {
@@ -343,7 +457,7 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
                 //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), 0.0);
-                var pos = vec3.fromValues(start_x - (dist_x * j), 15.0, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x - (dist_x * j), 20.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -441,7 +555,7 @@ export class ClothRenderer extends RendererOrigin {
         // this.particles[this.N-1].fixed = true;
 
         this.numParticles = this.particles.length;
-        console.log("create node success");
+        console.log("make #",this.numParticles," particles create success");
         for (let i = 0; i < this.particles.length; i++) {
             let nConnectedTriangle = this.particles[i].triangles.length;
             this.maxTriangleConnected = Math.max(this.maxTriangleConnected, nConnectedTriangle);
@@ -606,6 +720,7 @@ export class ClothRenderer extends RendererOrigin {
             // console.log(i, " => ", sp.index2 , " / ", this.springs[i].targetIndex2);
         }
         console.log("maxSpringConnected : #", this.maxSpringConnected);
+        console.log("make #",this.springs.length," spring create success");
     }
     createClothBuffers() {
         const positionData = new Float32Array(this.particles.flatMap(p => [p.position[0], p.position[1], p.position[2]]));
@@ -1324,7 +1439,7 @@ export class ClothRenderer extends RendererOrigin {
             },
         });
     }
-    createTrianglePipeline() {
+    createTrianglePipeline(render_type:string ='triangle-list') {
         const textureShaderModule = this.device.createShaderModule({ code: this.particleShader.getTextureShader() });
         const bindGroupLayout = this.device.createBindGroupLayout({
             entries: [
@@ -1511,6 +1626,15 @@ export class ClothRenderer extends RendererOrigin {
         computePass2.dispatchWorkgroups(Math.ceil(this.numParticles / 256.0) + 1, 1, 1);
         computePass2.end();
     }
+
+    tritriIntersections(commandEncoder: GPUCommandEncoder){
+        const computePass = commandEncoder.beginComputePass();
+        computePass.setPipeline(this.computeIntersectionPipeline);
+        computePass.setBindGroup(0, this.computeIntersectionBindGroup);
+        computePass.dispatchWorkgroups(Math.ceil(this.triangles.length / 16.0) + 1, (this.objectIndicesLength / 3) / 16.0 + 1, 1);
+        computePass.end();
+    }
+
     renderCloth(commandEncoder: GPUCommandEncoder) {
         const passEncoder = commandEncoder.beginRenderPass(this.renderPassDescriptor);
         this.device.queue.writeBuffer(
@@ -1525,8 +1649,7 @@ export class ClothRenderer extends RendererOrigin {
         passEncoder.setVertexBuffer(2, this.objectNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
         passEncoder.setIndexBuffer(this.objectIndexBuffer, 'uint32'); // 인덱스 포맷 수정
         passEncoder.setBindGroup(0, this.objectBindGroup); // Set the bind group with MVP matrix
-        passEncoder.drawIndexed(this.objectIndicesLength);
-        console.log(this.objectIndicesLength);
+        passEncoder.drawIndexed(this.objectIndicesLength);        
 
         if (this.renderOptions.wireFrame) {
             passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        

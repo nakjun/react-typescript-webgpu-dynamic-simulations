@@ -34,7 +34,7 @@ export function makeUInt32ArrayBuffer(device: GPUDevice, data: any) {
 export function makeUInt32IndexArrayBuffer(device: GPUDevice, data: any) {
     const buffer = device.createBuffer({
         size: data.byteLength,
-        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
         mappedAtCreation: true
     });
     new Uint32Array(buffer.getMappedRange()).set(data);
