@@ -1,13 +1,17 @@
 export class IntersectionShader {
     intersection_shader = `
     @group(0) @binding(0) var<storage, read_write> positionsCloth: array<f32>;
-    @group(0) @binding(1) var<storage, read_write> triangleCloth: array<triangles_cloth>;
+    @group(0) @binding(1) var<storage, read_write> velocities: array<f32>;
     
     @group(0) @binding(2) var<storage, read_write> positionsObject: array<f32>;
     @group(0) @binding(3) var<storage, read_write> triangleObject: array<triangles_object>;
     
-    @group(0) @binding(4) var<uniform> numTrianglesCloth: u32;
+    @group(0) @binding(4) var<uniform> numParticles: u32;
     @group(0) @binding(5) var<uniform> numTrianglesObject: u32;
+
+    @group(0) @binding(6) var<storage, read_write> tempBuffer: array<f32>;
+
+    @group(0) @binding(7) var<storage, read_write> fixed: array<u32>;
 
     struct triangles_cloth{
         v1: f32,
@@ -19,16 +23,233 @@ export class IntersectionShader {
     }
 
     struct triangles_object{
-        v1:f32,
-        v2:f32,
-        v3:f32
+        v1:u32,
+        v2:u32,
+        v3:u32
     }
 
     struct vec2f{
         x:f32,
         y:f32
     }
+    
+    fn getClothVertexPosition(index: u32) -> vec3<f32> {
+        let i = index * 3u; // Assuming each vertex is represented by three consecutive floats (x, y, z)
+        return vec3<f32>(positionsCloth[i], positionsCloth[i + 1u], positionsCloth[i + 2u]);
+    }
 
+    fn getClothVertexVelocity(index: u32) -> vec3<f32> {
+        let i = index * 3u; // Assuming each vertex is represented by three consecutive floats (x, y, z)
+        return vec3<f32>(velocities[i], velocities[i + 1u], velocities[i + 2u]);
+    }
+
+    fn getTempBuffer(index: u32) -> vec3<f32> {
+        let i = index * 3u; // Assuming each vertex is represented by three consecutive floats (x, y, z)
+        return vec3<f32>(tempBuffer[i], tempBuffer[i + 1u], tempBuffer[i + 2u]);
+    }
+
+    fn getObjectVertexPosition(index: u32) -> vec3<f32> {
+        let i = index * 3u; // Assuming each vertex is represented by three consecutive floats (x, y, z)
+        return vec3<f32>(positionsObject[i], positionsObject[i + 1u], positionsObject[i + 2u]);
+    }
+    
+    fn barycentricCoords(A: vec3<f32>, B: vec3<f32>, C: vec3<f32>, P: vec3<f32>) -> vec3<f32> {
+        let v0 = B - A;
+        let v1 = C - A;
+        let v2 = P - A;
+
+        let d00 = dot(v0, v0);
+        let d01 = dot(v0, v1);
+        let d11 = dot(v1, v1);
+        let d20 = dot(v2, v0);
+        let d21 = dot(v2, v1);
+        let denom = d00 * d11 - d01 * d01;
+    
+        let v = (d11 * d20 - d01 * d21) / denom;
+        let w = (d00 * d21 - d01 * d20) / denom;
+        let u = 1.0 - v - w;
+    
+        return vec3<f32>(u, v, w);
+    }
+    
+    fn pointInTriangle(barycentricCoords: vec3<f32>) -> bool {
+        let u = barycentricCoords.x;
+        let v = barycentricCoords.y;
+        let w = barycentricCoords.z;
+    
+        return (u >= 0.0) && (v >= 0.0) && (w >= 0.0) && (u + v + w <= 1.0);
+    }
+
+    fn isPointInPlane(A: vec3<f32>, B: vec3<f32>, C: vec3<f32>, P: vec3<f32>, epsilon: f32) -> bool {
+        let planeNormal = cross(B - A, C - A);
+        let pointVector = P - A;
+        let dotProduct = dot(planeNormal, pointVector);
+
+        return abs(dotProduct) <= epsilon;
+    }
+
+    fn isPointInPlane2(A: vec3<f32>, B: vec3<f32>, C: vec3<f32>, P: vec3<f32>, epsilon: f32) -> f32 {
+        let planeNormal = cross(B - A, C - A);
+        let pointVector = P - A;
+        let dotProduct = dot(planeNormal, pointVector);
+        return abs(dotProduct);
+    }
+    
+    struct CollisionResult {
+        hit: bool,
+        point: vec3<f32>,
+    };
+    
+    fn checkEdgeTriangleCollision(startPos: vec3<f32>, endPos: vec3<f32>, triangleVertices: array<vec3<f32>, 3>) -> CollisionResult {
+        let edgeVector = endPos - startPos;
+        let rayVector = normalize(edgeVector);
+        let edge1 = triangleVertices[1] - triangleVertices[0];
+        let edge2 = triangleVertices[2] - triangleVertices[0];
+        let h = cross(rayVector, edge2);
+        let a = dot(edge1, h);
+    
+        let EPSILON = 0.01;
+        if (a > -EPSILON && a < EPSILON) {
+            return CollisionResult(false, vec3<f32>(0.0, 0.0, 0.0)); // Parallel, no intersection
+        }
+    
+        let f = 1.0 / a;
+        let s = startPos - triangleVertices[0];
+        let u = f * dot(s, h);
+        if (u < 0.0 || u > 1.0) {
+            return CollisionResult(false, vec3<f32>(0.0, 0.0, 0.0));
+        }
+    
+        let q = cross(s, edge1);
+        let v = f * dot(rayVector, q);
+        if (v < 0.0 || u + v > 1.0) {
+            return CollisionResult(false, vec3<f32>(0.0, 0.0, 0.0));
+        }
+    
+        let t = f * dot(edge2, q);
+        if (t > EPSILON && t < length(edgeVector)) { // Check if intersection is within the edge bounds
+            let intersectionPoint = startPos + t * rayVector; // Calculate intersection point
+            return CollisionResult(true, intersectionPoint);
+        }
+        return CollisionResult(false, vec3<f32>(0.0, 0.0, 0.0));
+    }
+    
+    @compute @workgroup_size(16, 16, 1)
+    fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+        let x: u32 = global_id.x;
+        let y: u32 = global_id.y;
+        
+        if(x >= numParticles) {return;}
+        if(y >= numTrianglesObject) {return;}
+
+        var targetIndex = x * numTrianglesObject + y;
+
+        var fix = fixed[x];
+        if(fix==1) {return;}
+
+        var pos = getClothVertexPosition(x);
+        var vel = getClothVertexVelocity(x);
+
+        var object_tri_info = triangleObject[y];
+        var f2: vec3<u32> = vec3<u32>(u32(object_tri_info.v1), u32(object_tri_info.v2), u32(object_tri_info.v3));
+
+        var tri2_vtx: array<vec3<f32>, 3> = array<vec3<f32>, 3>(
+            getObjectVertexPosition(f2.x),
+            getObjectVertexPosition(f2.y),
+            getObjectVertexPosition(f2.z)
+        );
+
+        var deltaTime: f32 = 0.001; // Assuming 60 FPS for simplicity
+        
+        var next_pos = pos + (vel * deltaTime);
+        var prev_pos = pos - (vel * deltaTime);
+
+        var direction = -1.5 * (vel * deltaTime);
+
+        var threshold = 1.0;
+
+        var edgeTriangleCollisionResult1 = checkEdgeTriangleCollision(pos, next_pos, tri2_vtx);        
+        var edgeTriangleCollisionResult2 = checkEdgeTriangleCollision(prev_pos, pos, tri2_vtx);        
+
+        var rC = isPointInPlane(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], prev_pos, threshold);        
+        var bC = barycentricCoords(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], prev_pos);
+
+        var rC1 = isPointInPlane(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], pos, threshold);        
+        var bC1 = barycentricCoords(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], pos);
+
+        var rC2 = isPointInPlane(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], next_pos, threshold);
+        var bC2 = barycentricCoords(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], next_pos);
+
+        if( (rC && pointInTriangle(bC)) || (rC1 && pointInTriangle(bC1)) || (rC2 && pointInTriangle(bC2)) ){        
+            tempBuffer[targetIndex*3 + 0] = direction.x;
+            tempBuffer[targetIndex*3 + 1] = direction.y;
+            tempBuffer[targetIndex*3 + 2] = direction.z;
+        }
+        else{
+            tempBuffer[targetIndex*3 + 0] = 0.0;
+            tempBuffer[targetIndex*3 + 1] = 0.0;
+            tempBuffer[targetIndex*3 + 2] = 0.0;
+        }
+    }
+
+    @compute @workgroup_size(256)
+    fn summation(@builtin(global_invocation_id) global_id: vec3<u32>) {
+        let x: u32 = global_id.x;
+        
+        if(x > numParticles) {return;}
+
+        var fix = fixed[x];
+        if(fix==1) {return;}
+
+        var pos = getClothVertexPosition(x);
+        var vel = getClothVertexVelocity(x);
+
+        var start = x * numTrianglesObject;
+        var end = (x+1) * numTrianglesObject;
+
+        var newPos = vec3<f32>(0.0, 0.0, 0.0);
+        var count = 0;
+
+        for(var i: u32 = start; i < end; i++) {
+            var data = getTempBuffer(i);                        
+            newPos.x += data.x;
+            newPos.y += data.y;
+            newPos.z += data.z;
+        }
+
+        newPos.x /= f32(numTrianglesObject);
+        newPos.y /= f32(numTrianglesObject);
+        newPos.z /= f32(numTrianglesObject);
+
+        pos.x += (newPos.x * 2.0);
+        pos.y += (newPos.y * 2.0);
+        pos.z += (newPos.z * 2.0);
+
+        var threshold:f32 = 0.000001;
+
+        if(newPos.x<=threshold && newPos.y<=threshold && newPos.z<=threshold){
+                
+        }else{
+            //fixed[x] = 1;
+            
+            vel *= 0.0001;
+
+            velocities[x*3 + 0] = vel.x;
+            velocities[x*3 + 1] = vel.y;
+            velocities[x*3 + 2] = vel.z;
+
+        }
+        positionsCloth[x*3 + 0] = pos.x;
+        positionsCloth[x*3 + 1] = pos.y;
+        positionsCloth[x*3 + 2] = pos.z;    
+    }
+    `;
+
+    getIntersectionShader() {
+        return this.intersection_shader;
+    }
+
+    tritriIntersectionShader = `
     fn orient_2D(a: vec2<f32>, b: vec2<f32>, c: vec2<f32>) -> f32 {
         return (a.x - c.x) * (b.y - c.y) - (a.y - c.y) * (b.x - c.x);
     }
@@ -547,67 +768,5 @@ export class IntersectionShader {
             }            
         }
     }
-    
-    fn getClothVertexPosition(index: u32) -> vec3<f32> {
-        let i = index * 3u; // Assuming each vertex is represented by three consecutive floats (x, y, z)
-        return vec3<f32>(positionsCloth[i], positionsCloth[i + 1u], positionsCloth[i + 2u]);
-    }
-
-    fn getObjectVertexPosition(index: u32) -> vec3<f32> {
-        let i = index * 3u; // Assuming each vertex is represented by three consecutive floats (x, y, z)
-        return vec3<f32>(positionsObject[i], positionsObject[i + 1u], positionsObject[i + 2u]);
-    }
-    
-
-    @compute @workgroup_size(16, 16, 1)
-    fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-        let x: u32 = global_id.x;
-        let y: u32 = global_id.y;
-        
-        if(x > numTrianglesCloth) {return;}
-        if(y > numTrianglesObject) {return;}
-
-        var cloth_tri_info = triangleCloth[x];
-        var object_tri_info = triangleObject[y];
-
-        var f1: vec3<u32> = vec3<u32>(u32(cloth_tri_info.v1), u32(cloth_tri_info.v2), u32(cloth_tri_info.v3));
-        var f2: vec3<u32> = vec3<u32>(u32(object_tri_info.v1), u32(object_tri_info.v2), u32(object_tri_info.v3));
-
-        var tri1_vtx: array<vec3<f32>, 3> = array<vec3<f32>, 3>(
-            getClothVertexPosition(f1.x),
-            getClothVertexPosition(f1.y),
-            getClothVertexPosition(f1.z)
-        );
-        var tri2_vtx: array<vec3<f32>, 3> = array<vec3<f32>, 3>(
-            getObjectVertexPosition(f2.x),
-            getObjectVertexPosition(f2.y),
-            getObjectVertexPosition(f2.z)
-        );
-
-        var result = tri_tri_overlap_3D(f1, f2, tri1_vtx, tri2_vtx);        
-        if(result){
-            var c1:vec3<f32> = (tri1_vtx[0] + tri1_vtx[1] + tri1_vtx[2]);
-            var c2:vec3<f32> = (tri2_vtx[0] + tri2_vtx[1] + tri2_vtx[2]);
-            
-            var direction = normalize(c2 - c1);
-
-            // positionsCloth[f1.x + 0] -= (direction.x * 0.01);
-            // positionsCloth[f1.x + 1] -= (direction.y * 0.01);
-            // positionsCloth[f1.x + 2] -= (direction.z * 0.01);
-
-            // positionsCloth[f1.y + 0] -= (direction.x * 0.01);
-            // positionsCloth[f1.y + 1] -= (direction.y * 0.01);
-            // positionsCloth[f1.y + 2] -= (direction.z * 0.01);
-
-            // positionsCloth[f1.z + 0] -= (direction.x * 0.01);
-            // positionsCloth[f1.z + 1] -= (direction.y * 0.01);
-            // positionsCloth[f1.z + 2] -= (direction.z * 0.01);
-        }
-    }
-
     `;
-
-    getIntersectionShader() {
-        return this.intersection_shader;
-    }
 }

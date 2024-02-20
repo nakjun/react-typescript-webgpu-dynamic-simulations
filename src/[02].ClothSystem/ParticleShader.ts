@@ -112,7 +112,7 @@ export class ParticleShader {
             vec3<f32>(10.0, 50.0, -10.0) // 조명 4의 위치
         );
 
-        let shininess: f32 = 128.0;
+        let shininess: f32 = 32.0;
         let lightColor: vec4<f32> = vec4<f32>(0.95, 0.95, 0.9, 1.0);
 
         // 텍스처 샘플링
@@ -126,7 +126,6 @@ export class ParticleShader {
             let norm: vec3<f32> = normalize(Normal);
             let lightDir: vec3<f32> = normalize(lightPos - FragPos);
             let diff: f32 = max(dot(norm, lightDir), 0.0);
-
             
             let specularStrength: f32 = 0.5;
             
@@ -205,7 +204,7 @@ export class ParticleShader {
         // }
         
         var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);
-        var deltaTime: f32 = 0.0007; // Assuming 60 FPS for simplicity
+        var deltaTime: f32 = 0.0005; // Assuming 60 FPS for simplicity
 
         vel += ((f + gravity) * deltaTime);
         pos += (vel * deltaTime);

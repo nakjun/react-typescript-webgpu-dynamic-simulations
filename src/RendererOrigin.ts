@@ -95,13 +95,12 @@ export class RendererOrigin {
     }
     printDeviceLimits(){
         const limits:GPUSupportedLimits = this.device.limits;
-
-        console.log("===GPU Device Limits from WebGPU===");
-        console.log("maxComputeWorkgroupSizeX:",limits.maxComputeWorkgroupSizeX);
-        console.log("maxComputeWorkgroupSizeY:",limits.maxComputeWorkgroupSizeY);
-        console.log("maxComputeWorkgroupSizeZ:",limits.maxComputeWorkgroupSizeZ);
-        console.log("maxComputeInvocationsPerWorkgroup:",limits.maxComputeInvocationsPerWorkgroup);
-        console.log("maxComputeWorkgroupsPerDimension:",limits.maxComputeWorkgroupsPerDimension);
+        this.systemGUI.gpuDeviceGui.add(limits, 'maxComputeWorkgroupSizeX').name('Max Compute Workgroup Size X');
+        this.systemGUI.gpuDeviceGui.add(limits, 'maxComputeWorkgroupSizeY').name('Max Compute Workgroup Size Y');
+        this.systemGUI.gpuDeviceGui.add(limits, 'maxComputeWorkgroupSizeZ').name('Max Compute Workgroup Size Z');
+        this.systemGUI.gpuDeviceGui.add(limits, 'maxComputeInvocationsPerWorkgroup').name('Max Compute Invocations Per Workgroup');
+        this.systemGUI.gpuDeviceGui.add(limits, 'maxComputeWorkgroupsPerDimension').name('Max Compute Workgroups Per Dimension');
+        this.systemGUI.gpuDeviceGui.add(limits, 'maxStorageBufferBindingSize').name('Max Storage Buffer Binding Size');
     }
 
     createDepthTexture() {
