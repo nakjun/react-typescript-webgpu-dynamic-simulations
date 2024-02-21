@@ -11,6 +11,7 @@ export class RendererOrigin {
     context!: GPUCanvasContext;
     format!: GPUTextureFormat;
     depthTexture!: GPUTexture;
+    resolveTexture!: GPUTexture;
     pipeline!: GPURenderPipeline;
     mvpUniformBuffer!: GPUBuffer;
 
@@ -18,7 +19,7 @@ export class RendererOrigin {
 
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(-61.0, 39.0, -62.0);
+    camera_position: vec3 = vec3.fromValues(-52.4, 31.2, -52.4);
     camera_target: vec3 = vec3.fromValues(0.0, 0.0, 0.0);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
@@ -38,11 +39,15 @@ export class RendererOrigin {
         camPosX: this.camera_position[0],
         camPosY: this.camera_position[1],
         camPosZ: this.camera_position[2],
+        renderObject: true,
     }
 
     camPosXControl: any;
     camPosYControl: any;
     camPosZControl: any;
+
+    sampleCount:number = 4; // 예: 4x MSAA 사용
+
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -62,7 +67,8 @@ export class RendererOrigin {
         this.systemGUI.performanceGui.add(this.stats, 'ms').name('ms').listen();
         this.systemGUI.performanceGui.add(this.stats, 'fps').name('fps').listen();
 
-        this.systemGUI.renderOptionGui.add(this.renderOptions, 'wireFrame').name('WireFrame');
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'wireFrame').name('WireFrame');        
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'renderObject').name('renderObject');
         this.camPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosX', -100, 100).name('Camera Position X').onChange((value: number) => {
             this.camera.position[0] = value;
         });
@@ -87,9 +93,10 @@ export class RendererOrigin {
         this.context.configure({
             device: this.device,
             format: this.format,
-            alphaMode: "opaque",
+            alphaMode: "premultiplied",
         });
         this.createDepthTexture();
+        this.createResolveTexture();
         this.printDeviceLimits();
 
     }
@@ -108,6 +115,16 @@ export class RendererOrigin {
             size: { width: this.canvas.width, height: this.canvas.height, depthOrArrayLayers: 1 },
             format: 'depth32float',
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            sampleCount: this.sampleCount
+        });
+    }
+
+    createResolveTexture() {
+        this.resolveTexture = this.device.createTexture({
+            size: { width: this.canvas.width, height: this.canvas.height, depthOrArrayLayers: 1 },
+            format: this.format,
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+            sampleCount: this.sampleCount
         });
     }
 

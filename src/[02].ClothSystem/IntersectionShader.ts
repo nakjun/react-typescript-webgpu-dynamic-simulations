@@ -134,6 +134,12 @@ export class IntersectionShader {
         return CollisionResult(false, vec3<f32>(0.0, 0.0, 0.0));
     }
     
+    fn calculateNormal(p0: vec3<f32>, p1: vec3<f32>, p2: vec3<f32>) -> vec3<f32> {
+        var u = p1 - p0;
+        var v = p2 - p0;
+        return normalize(cross(u, v));
+    }
+
     @compute @workgroup_size(16, 16, 1)
     fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let x: u32 = global_id.x;
@@ -159,14 +165,14 @@ export class IntersectionShader {
             getObjectVertexPosition(f2.z)
         );
 
+        var tri_normal = calculateNormal(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2]);
+
         var deltaTime: f32 = 0.001; // Assuming 60 FPS for simplicity
         
         var next_pos = pos + (vel * deltaTime);
         var prev_pos = pos - (vel * deltaTime);
 
-        var direction = -1.5 * (vel * deltaTime);
-
-        var threshold = 1.0;
+        var threshold = 0.2;
 
         var edgeTriangleCollisionResult1 = checkEdgeTriangleCollision(pos, next_pos, tri2_vtx);        
         var edgeTriangleCollisionResult2 = checkEdgeTriangleCollision(prev_pos, pos, tri2_vtx);        
@@ -181,9 +187,9 @@ export class IntersectionShader {
         var bC2 = barycentricCoords(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], next_pos);
 
         if( (rC && pointInTriangle(bC)) || (rC1 && pointInTriangle(bC1)) || (rC2 && pointInTriangle(bC2)) ){        
-            tempBuffer[targetIndex*3 + 0] = direction.x;
-            tempBuffer[targetIndex*3 + 1] = direction.y;
-            tempBuffer[targetIndex*3 + 2] = direction.z;
+            tempBuffer[targetIndex*3 + 0] = tri_normal.x * 2.0;
+            tempBuffer[targetIndex*3 + 1] = tri_normal.y * 2.0;
+            tempBuffer[targetIndex*3 + 2] = tri_normal.z * 2.0;
         }
         else{
             tempBuffer[targetIndex*3 + 0] = 0.0;
@@ -221,9 +227,9 @@ export class IntersectionShader {
         newPos.y /= f32(numTrianglesObject);
         newPos.z /= f32(numTrianglesObject);
 
-        pos.x += (newPos.x * 2.0);
-        pos.y += (newPos.y * 2.0);
-        pos.z += (newPos.z * 2.0);
+        pos.x += (newPos.x);
+        pos.y += (newPos.y);
+        pos.z += (newPos.z);
 
         var threshold:f32 = 0.000001;
 
@@ -232,7 +238,7 @@ export class IntersectionShader {
         }else{
             //fixed[x] = 1;
             
-            vel *= 0.0001;
+            vel *= 0.01;
 
             velocities[x*3 + 0] = vel.x;
             velocities[x*3 + 1] = vel.y;

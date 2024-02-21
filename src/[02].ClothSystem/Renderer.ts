@@ -188,7 +188,7 @@ export class ClothRenderer extends RendererOrigin {
                 width: imageData.width,
                 height: imageData.height
             },
-            format: "rgba8unorm",
+            format: "rgba8unorm",            
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
         };
 
@@ -197,18 +197,18 @@ export class ClothRenderer extends RendererOrigin {
         device.queue.copyExternalImageToTexture(
             { source: imageData },
             { texture: texture },
-            { width: imageData.width, height: imageData.height }
+            { width: imageData.width, height: imageData.height },            
         );
 
         return texture;
     }
     async createAssets() {
-        const assets1 = await this.createTextureFromImage("./textures/siggraph.png", this.device);
+        const assets1 = await this.createTextureFromImage("./textures/argyle2.jpg", this.device);
         this.texture = assets1.texture;
         this.sampler = assets1.sampler;
         this.view = assets1.view;
 
-        const assets2 = await this.createTextureFromImage("./textures/high_jean.jpg", this.device);
+        const assets2 = await this.createTextureFromImage("./textures/argyle1.jpg", this.device);
         this.textureObject = assets2.texture;
         this.samplerObject = assets2.sampler;
         this.viewObject = assets2.view;
@@ -303,8 +303,8 @@ export class ClothRenderer extends RendererOrigin {
     async MakeModelData() {
         const loader = new ObjLoader();
 
-        this.model = await loader.load('./objects/skybox.obj', 10.0);
-        //this.model = await loader.load('./objects/bunny.obj', 100.0);
+        //this.model = await loader.load('./objects/skybox.obj', 10.0);
+        this.model = await loader.load('./objects/low_bunny.obj', 0.18);
         //this.model = await loader.load('./objects/armadillo.obj', 30.0);
         //this.model = await loader.load('./objects/dragon.obj', 2.0);
 
@@ -317,9 +317,7 @@ export class ClothRenderer extends RendererOrigin {
         var uvArray = new Float32Array(this.model.uvs);
         this.objectIndicesLength = this.model.indices.length;
 
-
-        // console.log(vertArray);
-        // console.log(indArray);
+        console.log("this object's indices length: " + this.objectIndicesLength / 3);
 
         // 여기서부터는 dragonModel의 데이터가 모두 준비되었으므로, 버퍼 생성 등의 로직을 실행합니다.
         this.ObjectPosBuffer = makeFloat32ArrayBufferStorage(this.device, vertArray);
@@ -488,7 +486,7 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
                 //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), 0.0);
-                var pos = vec3.fromValues(start_x - (dist_x * j), 15.0, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x - (dist_x * j), 12.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -572,9 +570,9 @@ export class ClothRenderer extends RendererOrigin {
         this.triangleIndices = new Uint32Array(indices);
 
         //first line fix
-        for (let i = 0; i < this.N; i++) {
-            this.particles[i].fixed = true;
-        }
+        // for (let i = 0; i < this.N; i++) {
+        //     this.particles[i].fixed = true;
+        // }
         // for (let i = 0; i < this.N / 3; i++) {
         //     this.particles[i].fixed = true;
         // }
@@ -1424,6 +1422,9 @@ export class ClothRenderer extends RendererOrigin {
                 depthCompare: 'less',
                 format: 'depth32float',
             },
+            multisample: {
+                count: this.sampleCount,
+            },
         });
         console.log("create render pipeline success");
     }
@@ -1471,6 +1472,9 @@ export class ClothRenderer extends RendererOrigin {
                 depthWriteEnabled: true,
                 depthCompare: 'less',
                 format: 'depth32float',
+            },
+            multisample: {
+                count: this.sampleCount,
             },
         });
     }
@@ -1610,6 +1614,9 @@ export class ClothRenderer extends RendererOrigin {
                 depthCompare: 'less',
                 format: 'depth32float',
             },
+            multisample: {
+                count: this.sampleCount,
+            },
         });
     }
 
@@ -1684,14 +1691,15 @@ export class ClothRenderer extends RendererOrigin {
             0,
             new Float32Array([...this.camera.position, 1.0]) // vec3 + padding
         );
-
-        passEncoder.setPipeline(this.trianglePipeline);
-        passEncoder.setVertexBuffer(0, this.ObjectPosBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        passEncoder.setVertexBuffer(1, this.objectUVBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        passEncoder.setVertexBuffer(2, this.objectNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-        passEncoder.setIndexBuffer(this.objectIndexBuffer, 'uint32'); // 인덱스 포맷 수정
-        passEncoder.setBindGroup(0, this.objectBindGroup); // Set the bind group with MVP matrix
-        passEncoder.drawIndexed(this.objectIndicesLength);
+        if(this.renderOptions.renderObject){
+            passEncoder.setPipeline(this.trianglePipeline);
+            passEncoder.setVertexBuffer(0, this.ObjectPosBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+            passEncoder.setVertexBuffer(1, this.objectUVBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+            passEncoder.setVertexBuffer(2, this.objectNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+            passEncoder.setIndexBuffer(this.objectIndexBuffer, 'uint32'); // 인덱스 포맷 수정
+            passEncoder.setBindGroup(0, this.objectBindGroup); // Set the bind group with MVP matrix
+            passEncoder.drawIndexed(this.objectIndicesLength);
+        }
 
         if (this.renderOptions.wireFrame) {
             passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
@@ -1724,7 +1732,8 @@ export class ClothRenderer extends RendererOrigin {
     makeRenderpassDescriptor() {
         this.renderPassDescriptor = {
             colorAttachments: [{
-                view: this.context.getCurrentTexture().createView(),
+                view: this.resolveTexture.createView(),
+                resolveTarget: this.context.getCurrentTexture().createView(),
                 clearValue: { r: 0.25, g: 0.25, b: 0.25, a: 1.0 }, // Background color
                 loadOp: 'clear',
                 storeOp: 'store',
@@ -1734,7 +1743,7 @@ export class ClothRenderer extends RendererOrigin {
                 depthClearValue: 1.0,
                 depthLoadOp: 'clear',
                 depthStoreOp: 'store',
-            }
+            },        
         };
     }
 }

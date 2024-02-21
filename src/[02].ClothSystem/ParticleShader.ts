@@ -101,48 +101,73 @@ export class ParticleShader {
     
     @fragment
     fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {    
-        var ambientColor: vec4<f32> = vec4<f32>(0.1, 0.1, 0.1, 1.0);
-        var finalColor: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        // var ambientColor: vec4<f32> = vec4<f32>(0.1, 0.1, 0.1, 1.0);
+        // var finalColor: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
-        // 조명 설정 예시
-        var lights: array<vec3<f32>, 4> = array<vec3<f32>, 4>(
-            vec3<f32>(-10.0, 50.0, 10.0), // 조명 1의 위치
-            vec3<f32>(10.0, 50.0, 10.0), // 조명 2의 위치
-            vec3<f32>(-10.0, 50.0, -10.0), // 조명 3의 위치
-            vec3<f32>(10.0, 50.0, -10.0) // 조명 4의 위치
-        );
+        // // 조명 설정 예시
+        // var lights: array<vec3<f32>, 4> = array<vec3<f32>, 4>(
+        //     vec3<f32>(-10.0, 50.0, 10.0), // 조명 1의 위치
+        //     vec3<f32>(10.0, 50.0, 10.0), // 조명 2의 위치
+        //     vec3<f32>(-10.0, 50.0, -10.0), // 조명 3의 위치
+        //     vec3<f32>(10.0, 50.0, -10.0) // 조명 4의 위치
+        // );
 
-        let shininess: f32 = 32.0;
-        let lightColor: vec4<f32> = vec4<f32>(0.95, 0.95, 0.9, 1.0);
+        // let shininess: f32 = 16.0;
+        // let lightColor: vec4<f32> = vec4<f32>(0.95, 0.95, 0.9, 1.0);
 
-        // 텍스처 샘플링
+        // // 텍스처 샘플링
+        // let texColor: vec4<f32> = textureSample(myTexture, mySampler, TexCoord);
+
+        // var shadowFactor: f32 = 2.0;
+
+        // // 모든 조명에 대해 반복
+        // for (var i: i32 = 0; i < 4; i = i + 1) {
+        //     let lightPos: vec3<f32> = lights[i];
+        //     let norm: vec3<f32> = normalize(Normal);
+        //     let lightDir: vec3<f32> = normalize(lightPos - FragPos);
+        //     let diff: f32 = max(dot(norm, lightDir), 0.0);
+            
+        //     let specularStrength: f32 = 0.5;
+            
+        //     let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
+        //     let reflectDir: vec3<f32> = reflect(-lightDir, norm);
+        //     let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+            
+        //     var shadowValue = dot(viewDir, lightDir);
+        //     let ambient: vec4<f32> = ambientColor * texColor;
+        //     let diffuse: vec4<f32> = (lightColor * diff * texColor) * (shadowValue * shadowFactor);
+        //     let specular: vec4<f32> = lightColor * spec * specularStrength * (shadowValue * shadowFactor);
+
+        //     finalColor += ambient + diffuse + specular;
+        // }
+
+        // finalColor /= 4.0;
+
+        // return finalColor;
+        let ambientStrength: f32 = 0.5;
+        let ambientColor: vec4<f32> = vec4<f32>(0.25, 0.25, 0.25, 1.0) * ambientStrength;
+        
+        let lightPos: vec3<f32> = vec3<f32>(-10.0, 70.0, -20.0);
+        let lightColor: vec4<f32> = vec4<f32>(0.75, 0.75, 0.75, 1.0);
+        let lightIntensity: f32 = 2.0;
+        
         let texColor: vec4<f32> = textureSample(myTexture, mySampler, TexCoord);
-
-        var shadowFactor: f32 = 1.0;
-
-        // 모든 조명에 대해 반복
-        for (var i: i32 = 0; i < 2; i = i + 1) {
-            let lightPos: vec3<f32> = lights[i];
-            let norm: vec3<f32> = normalize(Normal);
-            let lightDir: vec3<f32> = normalize(lightPos - FragPos);
-            let diff: f32 = max(dot(norm, lightDir), 0.0);
-            
-            let specularStrength: f32 = 0.5;
-            
-            let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
-            let reflectDir: vec3<f32> = reflect(-lightDir, norm);
-            let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
-            
-            var shadowValue = dot(viewDir, lightDir);
-            let ambient: vec4<f32> = ambientColor * texColor;
-            let diffuse: vec4<f32> = (lightColor * diff * texColor) * shadowFactor;
-            let specular: vec4<f32> = lightColor * spec * specularStrength * shadowFactor;
-
-            finalColor += ambient + diffuse + specular;
-        }
-
+        
+        let norm: vec3<f32> = normalize(Normal);
+        let lightDir: vec3<f32> = normalize(lightPos - FragPos);
+        let diff: f32 = max(dot(norm, lightDir), 0.0);
+        let diffuse: vec4<f32> = lightColor * diff * texColor * lightIntensity;
+        
+        let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
+        let reflectDir: vec3<f32> = reflect(-lightDir, norm);
+        let specularStrength: f32 = 0.75;
+        let shininess: f32 = 32.0;
+        let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+        let specular: vec4<f32> = lightColor * spec * specularStrength;
+        
+        var finalColor: vec4<f32> = ambientColor + diffuse + specular;
         return finalColor;
-
+    
     }
 
     
