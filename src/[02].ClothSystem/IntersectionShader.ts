@@ -9,9 +9,13 @@ export class IntersectionShader {
     @group(0) @binding(4) var<uniform> numParticles: u32;
     @group(0) @binding(5) var<uniform> numTrianglesObject: u32;
 
-    @group(0) @binding(6) var<storage, read_write> tempBuffer: array<f32>;
+    @group(0) @binding(6) var<storage, read_write> tempBuffer: array<atomicTemp>;
 
     @group(0) @binding(7) var<storage, read_write> fixed: array<u32>;
+
+    struct atomicTemp{
+        a: atomic<u32>
+    }
 
     struct triangles_cloth{
         v1: f32,
@@ -41,11 +45,6 @@ export class IntersectionShader {
     fn getClothVertexVelocity(index: u32) -> vec3<f32> {
         let i = index * 3u; // Assuming each vertex is represented by three consecutive floats (x, y, z)
         return vec3<f32>(velocities[i], velocities[i + 1u], velocities[i + 2u]);
-    }
-
-    fn getTempBuffer(index: u32) -> vec3<f32> {
-        let i = index * 3u; // Assuming each vertex is represented by three consecutive floats (x, y, z)
-        return vec3<f32>(tempBuffer[i], tempBuffer[i + 1u], tempBuffer[i + 2u]);
     }
 
     fn getObjectVertexPosition(index: u32) -> vec3<f32> {
@@ -148,7 +147,7 @@ export class IntersectionShader {
         if(x >= numParticles) {return;}
         if(y >= numTrianglesObject) {return;}
 
-        var targetIndex = x * numTrianglesObject + y;
+        //var targetIndex = x * numTrianglesObject + y;
 
         var fix = fixed[x];
         if(fix==1) {return;}
@@ -186,16 +185,25 @@ export class IntersectionShader {
         var rC2 = isPointInPlane(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], next_pos, threshold);
         var bC2 = barycentricCoords(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], next_pos);
 
-        if( (rC && pointInTriangle(bC)) || (rC1 && pointInTriangle(bC1)) || (rC2 && pointInTriangle(bC2)) ){        
-            tempBuffer[targetIndex*3 + 0] = tri_normal.x * 2.0;
-            tempBuffer[targetIndex*3 + 1] = tri_normal.y * 2.0;
-            tempBuffer[targetIndex*3 + 2] = tri_normal.z * 2.0;
+        var targetValue = pos - (vel * deltaTime * 2) * 100.0;
+
+        if( (rC && pointInTriangle(bC)) || (rC1 && pointInTriangle(bC1)) || (rC2 && pointInTriangle(bC2)) ){
+            atomicAdd(&tempBuffer[x * 3 + 0].a, u32(targetValue.x));
+            atomicAdd(&tempBuffer[x * 3 + 1].a, u32(targetValue.y));
+            atomicAdd(&tempBuffer[x * 3 + 2].a, u32(targetValue.z));    
         }
-        else{
-            tempBuffer[targetIndex*3 + 0] = 0.0;
-            tempBuffer[targetIndex*3 + 1] = 0.0;
-            tempBuffer[targetIndex*3 + 2] = 0.0;
-        }
+
+
+        // if( (rC && pointInTriangle(bC)) || (rC1 && pointInTriangle(bC1)) || (rC2 && pointInTriangle(bC2)) ){        
+        //     tempBuffer[targetIndex*3 + 0] = tri_normal.x * 2.0;
+        //     tempBuffer[targetIndex*3 + 1] = tri_normal.y * 2.0;
+        //     tempBuffer[targetIndex*3 + 2] = tri_normal.z * 2.0;
+        // }
+        // else{
+        //     tempBuffer[targetIndex*3 + 0] = 0.0;
+        //     tempBuffer[targetIndex*3 + 1] = 0.0;
+        //     tempBuffer[targetIndex*3 + 2] = 0.0;
+        // }
     }
 
     @compute @workgroup_size(256)
@@ -210,35 +218,40 @@ export class IntersectionShader {
         var pos = getClothVertexPosition(x);
         var vel = getClothVertexVelocity(x);
 
-        var start = x * numTrianglesObject;
-        var end = (x+1) * numTrianglesObject;
+        let tempX = atomicLoad(&tempBuffer[x * 3 + 0].a);
+        let tempY = atomicLoad(&tempBuffer[x * 3 + 1].a);
+        let tempZ = atomicLoad(&tempBuffer[x * 3 + 2].a);
+    
+    
 
         var newPos = vec3<f32>(0.0, 0.0, 0.0);
-        var count = 0;
 
-        for(var i: u32 = start; i < end; i++) {
-            var data = getTempBuffer(i);                        
-            newPos.x += data.x;
-            newPos.y += data.y;
-            newPos.z += data.z;
-        }
+        // var start = x * numTrianglesObject;
+        // var end = (x+1) * numTrianglesObject;
 
-        newPos.x /= f32(numTrianglesObject);
-        newPos.y /= f32(numTrianglesObject);
-        newPos.z /= f32(numTrianglesObject);
+        // var count = 0;
 
-        pos.x += (newPos.x);
-        pos.y += (newPos.y);
-        pos.z += (newPos.z);
+        // for(var i: u32 = start; i < end; i++) {
+        //     var data = getTempBuffer(i);                        
+        //     newPos.x += data.x;
+        //     newPos.y += data.y;
+        //     newPos.z += data.z;
+        // }
 
+        // newPos.x /= f32(numTrianglesObject);
+        // newPos.y /= f32(numTrianglesObject);
+        // newPos.z /= f32(numTrianglesObject);
+
+        newPos.x = pos.x + f32(tempX) / 100.0;
+        newPos.y = pos.y + f32(tempY) / 100.0;
+        newPos.z = pos.z + f32(tempZ) / 100.0;
+    
         var threshold:f32 = 0.000001;
 
-        if(newPos.x<=threshold && newPos.y<=threshold && newPos.z<=threshold){
-                
+        if(distance(pos,newPos) <= threshold) {
+                 
         }else{
-            //fixed[x] = 1;
-            
-            vel *= 0.01;
+            vel *= 0.3;
 
             velocities[x*3 + 0] = vel.x;
             velocities[x*3 + 1] = vel.y;

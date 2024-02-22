@@ -304,7 +304,7 @@ export class ClothRenderer extends RendererOrigin {
         const loader = new ObjLoader();
 
         //this.model = await loader.load('./objects/skybox.obj', 10.0);
-        this.model = await loader.load('./objects/low_bunny.obj', 0.18);
+        this.model = await loader.load('./objects/bunny.obj', 100.0);
         //this.model = await loader.load('./objects/armadillo.obj', 30.0);
         //this.model = await loader.load('./objects/dragon.obj', 2.0);
 
@@ -386,13 +386,24 @@ export class ClothRenderer extends RendererOrigin {
             ]
         });
 
-        const collisionTempData = new Float32Array(this.numParticles * this.objectIndicesLength);
+        // particle * triangle 구조로 테스트할 때 사용
+        // const collisionTempData = new Float32Array(this.numParticles * this.objectIndicesLength);
+        // this.collisionTempBuffer = this.device.createBuffer({
+        //     size: collisionTempData.byteLength,
+        //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+        //     mappedAtCreation: true,
+        // });
+        // new Float32Array(this.collisionTempBuffer.getMappedRange()).set(collisionTempData);
+        // this.collisionTempBuffer.unmap();
+
+        // atomic add를 사용해보려고 테스트
+        const collisionTempData = new Uint32Array(this.numParticles * 3);
         this.collisionTempBuffer = this.device.createBuffer({
             size: collisionTempData.byteLength,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
             mappedAtCreation: true,
         });
-        new Float32Array(this.collisionTempBuffer.getMappedRange()).set(collisionTempData);
+        new Uint32Array(this.collisionTempBuffer.getMappedRange()).set(collisionTempData);
         this.collisionTempBuffer.unmap();
 
         const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
@@ -486,7 +497,7 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
                 //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), 0.0);
-                var pos = vec3.fromValues(start_x - (dist_x * j), 12.0, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x - (dist_x * j), 25.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
