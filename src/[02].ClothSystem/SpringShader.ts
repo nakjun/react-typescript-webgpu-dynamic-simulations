@@ -3,9 +3,9 @@ export class SpringShader {
     springUpdateShader = `
     @group(0) @binding(0) var<storage, read_write> positions: array<f32>;
     @group(0) @binding(1) var<storage, read_write> velocities: array<f32>;
-    @group(0) @binding(2) var<storage, read> springs: array<Spring>; // Define SpringData appropriately    
+    @group(0) @binding(2) var<storage, read> springs: array<Spring>;
     @group(0) @binding(3) var<uniform> numSprings: u32;
-    @group(0) @binding(4) var<storage, read_write> nodeForce: array<f32>;
+    @group(0) @binding(4) var<storage, read_write> nodeForce: array<atomicI32>;
     @group(0) @binding(5) var<uniform> numParticles: u32;
 
     struct Spring {
@@ -17,6 +17,10 @@ export class SpringShader {
         target1: f32,
         target2: f32,
     };
+
+    struct atomicI32{
+        value: atomic<i32>
+    }
 
     fn getPosition(index:u32) -> vec3<f32>{
         return vec3<f32>(positions[index*3],positions[index*3+1],positions[index*3+2]);
@@ -38,8 +42,6 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     var i1 = u32(spring.index1);
     var i2 = u32(spring.index2);
 
-    var t1 = u32(spring.target1);
-    var t2 = u32(spring.target2);
     var pos1 = getPosition(i1);
     var pos2 = getPosition(i2);
 
@@ -57,16 +59,24 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     var s2 = dot(vel2,forceDirection);
 
     var damp = dot(velDirection, forceDirection) / len * spring.kd;
-
+    //var damp = -spring.kd * (s1 + s2);
     var estimatedForce = forceDirection * (spforce+damp) / len;              
 
-    nodeForce[t1 * 3 + 0] = estimatedForce.x;
-    nodeForce[t1 * 3 + 1] = estimatedForce.y;
-    nodeForce[t1 * 3 + 2] = estimatedForce.z;
+    // atomicAdd(&nodeForce[i1 * 3 + 0].value, i32(1));
+    // atomicAdd(&nodeForce[i1 * 3 + 1].value, i32(1));
+    // atomicAdd(&nodeForce[i1 * 3 + 2].value, i32(1));
 
-    nodeForce[t2 * 3 + 0] = -estimatedForce.x;
-    nodeForce[t2 * 3 + 1] = -estimatedForce.y;
-    nodeForce[t2 * 3 + 2] = -estimatedForce.z;
+    // atomicAdd(&nodeForce[i2 * 3 + 0].value, i32(-1));
+    // atomicAdd(&nodeForce[i2 * 3 + 1].value, i32(-1));
+    // atomicAdd(&nodeForce[i2 * 3 + 2].value, i32(-1));
+
+    atomicAdd(&nodeForce[i1 * 3 + 0].value, i32(estimatedForce.x*100.0));
+    atomicAdd(&nodeForce[i1 * 3 + 1].value, i32(estimatedForce.y*100.0));
+    atomicAdd(&nodeForce[i1 * 3 + 2].value, i32(estimatedForce.z*100.0));
+
+    atomicAdd(&nodeForce[i2 * 3 + 0].value, i32(-estimatedForce.x*100.0));
+    atomicAdd(&nodeForce[i2 * 3 + 1].value, i32(-estimatedForce.y*100.0));
+    atomicAdd(&nodeForce[i2 * 3 + 2].value, i32(-estimatedForce.z*100.0));
 }
     `;
 
@@ -75,13 +85,16 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     }
 
     nodeForceSummation = `
-    @group(0) @binding(0) var<storage, read_write> nodeForce: array<f32>;
+    @group(0) @binding(0) var<storage, read_write> nodeForce: array<atomicI32>;
     @group(0) @binding(1) var<storage, read_write> force: array<f32>;
-    @group(0) @binding(2) var<uniform> maxConnectedSpring: u32;
-    @group(0) @binding(3) var<uniform> numParticles: u32;
+    @group(0) @binding(2) var<uniform> numParticles: u32;
 
     fn getForce(index:u32) -> vec3<f32>{
         return vec3<f32>(force[index*3],force[index*3+1],force[index*3+2]);
+    }
+
+    struct atomicI32{
+        value: atomic<i32>
     }
 
     @compute @workgroup_size(256)
@@ -90,22 +103,15 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 
         if(id>=numParticles) {return;}
 
-        var f = getForce(id);        
-        f.x = 0.0;
-        f.y = 0.0;
-        f.z = 1.0; //z방향 wind
-        
-        // 파티클별 힘 합산을 0으로 초기화
-        // 각 파티클에 대해 연결된 모든 스프링의 힘을 합산
+        var f = getForce(id);
 
-        var start = (id * maxConnectedSpring);
-        var end = (id * maxConnectedSpring) + maxConnectedSpring;
+        let tempX = atomicLoad(&nodeForce[id * 3 + 0].value);
+        let tempY = atomicLoad(&nodeForce[id * 3 + 1].value);
+        let tempZ = atomicLoad(&nodeForce[id * 3 + 2].value);
 
-        for (var i: u32 = start; i < end; i++) {            
-            f.x += (nodeForce[i * 3 + 0] / 1.0);
-            f.y += (nodeForce[i * 3 + 1] / 1.0);
-            f.z += (nodeForce[i * 3 + 2] / 1.0);
-        }
+        f.x = f32(tempX) / 100.0;
+        f.y = f32(tempY) / 100.0;
+        f.z = f32(tempZ) / 100.0;
 
         force[id*3 + 0] = f32(f.x);
         force[id*3 + 1] = f32(f.y);
@@ -117,16 +123,14 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
         let id = global_id.x;
 
         if(id>=numParticles) {return;}
-
-        var f = getForce(id);     
-           
-        f.x = 0.0;
-        f.y = 0.0;
-        f.z = 0.0;
         
-        force[id*3 + 0] = f32(f.x);
-        force[id*3 + 1] = f32(f.y);
-        force[id*3 + 2] = f32(f.z);
+        atomicStore(&nodeForce[id * 3 + 0].value, i32(0));
+        atomicStore(&nodeForce[id * 3 + 1].value, i32(0));
+        atomicStore(&nodeForce[id * 3 + 2].value, i32(0));
+        
+        force[id*3 + 0] = f32(0.0);
+        force[id*3 + 1] = f32(0.0);
+        force[id*3 + 2] = f32(0.0);
     }
     
     `;

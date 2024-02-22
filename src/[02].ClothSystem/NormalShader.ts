@@ -94,6 +94,10 @@ export class NormalShader{
             let tempY = atomicLoad(&tempNormal[id * 3 + 1].value);
             let tempZ = atomicLoad(&tempNormal[id * 3 + 2].value);
 
+            atomicStore(&tempNormal[id * 3 + 0].value, u32(0));
+            atomicStore(&tempNormal[id * 3 + 1].value, u32(0));
+            atomicStore(&tempNormal[id * 3 + 2].value, u32(0));
+
             n.x = f32(tempX) / 100.0;
             n.y = f32(tempY) / 100.0;
             n.z = f32(tempZ) / 100.0;

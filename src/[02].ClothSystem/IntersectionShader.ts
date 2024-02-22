@@ -9,11 +9,11 @@ export class IntersectionShader {
     @group(0) @binding(4) var<uniform> numParticles: u32;
     @group(0) @binding(5) var<uniform> numTrianglesObject: u32;
 
-    @group(0) @binding(6) var<storage, read_write> tempBuffer: array<atomicTemp>;
+    @group(0) @binding(6) var<storage, read_write> tempBuffer: array<atomicU32>;
     @group(0) @binding(7) var<storage, read_write> fixed: array<u32>;
 
-    struct atomicTemp{
-        a: atomic<u32>
+    struct atomicU32{
+        value: atomic<u32>
     }
 
     struct triangles_cloth{
@@ -184,9 +184,9 @@ export class IntersectionShader {
         var targetValue = pos - (vel * deltaTime * 2) * 100.0;
 
         if( (rC && pointInTriangle(bC)) || (rC1 && pointInTriangle(bC1)) || (rC2 && pointInTriangle(bC2)) ){
-            atomicAdd(&tempBuffer[x * 3 + 0].a, u32(targetValue.x));
-            atomicAdd(&tempBuffer[x * 3 + 1].a, u32(targetValue.y));
-            atomicAdd(&tempBuffer[x * 3 + 2].a, u32(targetValue.z));    
+            atomicAdd(&tempBuffer[x * 3 + 0].value, u32(targetValue.x));
+            atomicAdd(&tempBuffer[x * 3 + 1].value, u32(targetValue.y));
+            atomicAdd(&tempBuffer[x * 3 + 2].value, u32(targetValue.z));    
         }
     }
 
@@ -202,9 +202,9 @@ export class IntersectionShader {
         var pos = getClothVertexPosition(x);
         var vel = getClothVertexVelocity(x);
 
-        let tempX = atomicLoad(&tempBuffer[x * 3 + 0].a);
-        let tempY = atomicLoad(&tempBuffer[x * 3 + 1].a);
-        let tempZ = atomicLoad(&tempBuffer[x * 3 + 2].a);
+        let tempX = atomicLoad(&tempBuffer[x * 3 + 0].value);
+        let tempY = atomicLoad(&tempBuffer[x * 3 + 1].value);
+        let tempZ = atomicLoad(&tempBuffer[x * 3 + 2].value);
         
         var newPos = vec3<f32>(0.0, 0.0, 0.0);
 
