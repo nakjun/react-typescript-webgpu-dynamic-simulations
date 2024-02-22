@@ -259,11 +259,6 @@ export class ClothRenderer extends RendererOrigin {
         this.InitNodeForce(commandEncoder);
         this.updateSprings(commandEncoder);
         this.summationNodeForce(commandEncoder);
-
-        // if (this.localFrameCount % 50 === 0 && this.frameCount < 10) {
-        //     await this.readBackPositionBuffer();
-        //     this.frameCount++;
-        // }
         this.Intersections(commandEncoder);
         this.updateParticles(commandEncoder);
         this.updateNormals(commandEncoder);
@@ -310,7 +305,6 @@ export class ClothRenderer extends RendererOrigin {
 
         console.log("object file load end");
 
-        //console.log(this.model.vertices, this.model.indices, this.model.uvs, this.model.normals);
         var vertArray = new Float32Array(this.model.vertices);
         var indArray = new Uint32Array(this.model.indices);
         var normalArray = new Float32Array(this.model.normals);
@@ -319,7 +313,6 @@ export class ClothRenderer extends RendererOrigin {
 
         console.log("this object's indices length: " + this.objectIndicesLength / 3);
 
-        // 여기서부터는 dragonModel의 데이터가 모두 준비되었으므로, 버퍼 생성 등의 로직을 실행합니다.
         this.ObjectPosBuffer = makeFloat32ArrayBufferStorage(this.device, vertArray);
         this.objectIndexBuffer = makeUInt32IndexArrayBuffer(this.device, indArray);
         this.objectUVBuffer = makeFloat32ArrayBufferStorage(this.device, uvArray);
@@ -497,7 +490,7 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
                 //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), 0.0);
-                var pos = vec3.fromValues(start_x - (dist_x * j), 25.0, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x - (dist_x * j), 19.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -533,19 +526,13 @@ export class ClothRenderer extends RendererOrigin {
                 const bottomLeft = (i + 1) * this.M + j;
                 const bottomRight = bottomLeft + 1;
 
-                var triangle1 = new Triangle(topLeft, bottomLeft, topRight);
-                triangle1.targetIndex1 = this.particles[topLeft].triangles.length;
-                triangle1.targetIndex2 = this.particles[bottomLeft].triangles.length;
-                triangle1.targetIndex3 = this.particles[topRight].triangles.length;
+                var triangle1 = new Triangle(topLeft, bottomLeft, topRight);                
                 this.triangles.push(triangle1);
                 this.particles[topLeft].triangles.push(triangle1);
                 this.particles[bottomLeft].triangles.push(triangle1);
                 this.particles[topRight].triangles.push(triangle1);
 
-                var triangle2 = new Triangle(topRight, bottomLeft, bottomRight);
-                triangle2.targetIndex1 = this.particles[topRight].triangles.length;
-                triangle2.targetIndex2 = this.particles[bottomLeft].triangles.length;
-                triangle2.targetIndex3 = this.particles[bottomRight].triangles.length;
+                var triangle2 = new Triangle(topRight, bottomLeft, bottomRight);                
                 this.triangles.push(triangle2);
                 this.particles[topRight].triangles.push(triangle2);
                 this.particles[bottomLeft].triangles.push(triangle2);
@@ -601,23 +588,6 @@ export class ClothRenderer extends RendererOrigin {
             this.maxTriangleConnected = Math.max(this.maxTriangleConnected, nConnectedTriangle);
         }
         console.log(this.maxTriangleConnected);
-
-        for (let i = 0; i < this.triangles.length; i++) {
-            var triangle = this.triangles[i];
-
-            //console.log(triangle.v1, triangle.v2, triangle.v3);
-
-            triangle.targetIndex1 += (this.maxTriangleConnected * triangle.v1);
-            triangle.targetIndex2 += (this.maxTriangleConnected * triangle.v2);
-            triangle.targetIndex3 += (this.maxTriangleConnected * triangle.v3);
-        }
-
-        //console.log(this.particles[7142].position, this.particles[7654].position, this.particles[7143].position);
-
-        // for(let i =0;i<this.triangles.length;i++){
-        //     var triangle = this.triangles[i];
-        //     console.log(triangle.targetIndex1,triangle.targetIndex2,triangle.targetIndex3);
-        // }
     }
     createSprings() {
         let index = 0;
@@ -829,15 +799,12 @@ export class ClothRenderer extends RendererOrigin {
         new Float32Array(this.springCalculationBuffer.getMappedRange()).set(springCalcData);
         this.springCalculationBuffer.unmap();
 
-        const triangleCalcData = new Float32Array(this.triangles.length * 6); // 7 elements per spring
+        const triangleCalcData = new Float32Array(this.triangles.length * 3); // 7 elements per spring
         this.triangles.forEach((triangle, i) => {
-            let offset = i * 6;
+            let offset = i * 3;
             triangleCalcData[offset] = triangle.v1;
             triangleCalcData[offset + 1] = triangle.v2;
             triangleCalcData[offset + 2] = triangle.v3;
-            triangleCalcData[offset + 3] = triangle.targetIndex1;
-            triangleCalcData[offset + 4] = triangle.targetIndex2;
-            triangleCalcData[offset + 5] = triangle.targetIndex3;
         });
         this.triangleCalculationBuffer = this.device.createBuffer({
             size: triangleCalcData.byteLength,
@@ -865,17 +832,14 @@ export class ClothRenderer extends RendererOrigin {
         new Float32Array(this.tempSpringForceBuffer.getMappedRange()).set(nodeSpringConnectedData);
         this.tempSpringForceBuffer.unmap();
 
-        const nodeTriangleConnectedData = new Float32Array(this.maxTriangleConnected * this.numParticles * 3);
+        const nodeTriangleConnectedData = new Uint32Array(this.numParticles * 3);
         this.tempTriangleNormalBuffer = this.device.createBuffer({
             size: nodeTriangleConnectedData.byteLength,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
             mappedAtCreation: true,
         });
-        new Float32Array(this.tempTriangleNormalBuffer.getMappedRange()).set(nodeTriangleConnectedData);
+        new Uint32Array(this.tempTriangleNormalBuffer.getMappedRange()).set(nodeTriangleConnectedData);
         this.tempTriangleNormalBuffer.unmap();
-
-        var size_temp = this.numParticles * this.maxTriangleConnected * 3;
-        //console.log("asd", size_temp * 4, this.tempTriangleNormalBuffer.size);
 
         this.camPosBuffer = this.device.createBuffer({
             size: 4 * Float32Array.BYTES_PER_ELEMENT, // vec3<f32> + padding

@@ -10,7 +10,6 @@ export class IntersectionShader {
     @group(0) @binding(5) var<uniform> numTrianglesObject: u32;
 
     @group(0) @binding(6) var<storage, read_write> tempBuffer: array<atomicTemp>;
-
     @group(0) @binding(7) var<storage, read_write> fixed: array<u32>;
 
     struct atomicTemp{
@@ -171,11 +170,8 @@ export class IntersectionShader {
         var next_pos = pos + (vel * deltaTime);
         var prev_pos = pos - (vel * deltaTime);
 
-        var threshold = 0.2;
-
-        var edgeTriangleCollisionResult1 = checkEdgeTriangleCollision(pos, next_pos, tri2_vtx);        
-        var edgeTriangleCollisionResult2 = checkEdgeTriangleCollision(prev_pos, pos, tri2_vtx);        
-
+        var threshold = 0.01;
+        
         var rC = isPointInPlane(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], prev_pos, threshold);        
         var bC = barycentricCoords(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], prev_pos);
 
@@ -192,18 +188,6 @@ export class IntersectionShader {
             atomicAdd(&tempBuffer[x * 3 + 1].a, u32(targetValue.y));
             atomicAdd(&tempBuffer[x * 3 + 2].a, u32(targetValue.z));    
         }
-
-
-        // if( (rC && pointInTriangle(bC)) || (rC1 && pointInTriangle(bC1)) || (rC2 && pointInTriangle(bC2)) ){        
-        //     tempBuffer[targetIndex*3 + 0] = tri_normal.x * 2.0;
-        //     tempBuffer[targetIndex*3 + 1] = tri_normal.y * 2.0;
-        //     tempBuffer[targetIndex*3 + 2] = tri_normal.z * 2.0;
-        // }
-        // else{
-        //     tempBuffer[targetIndex*3 + 0] = 0.0;
-        //     tempBuffer[targetIndex*3 + 1] = 0.0;
-        //     tempBuffer[targetIndex*3 + 2] = 0.0;
-        // }
     }
 
     @compute @workgroup_size(256)
@@ -221,43 +205,23 @@ export class IntersectionShader {
         let tempX = atomicLoad(&tempBuffer[x * 3 + 0].a);
         let tempY = atomicLoad(&tempBuffer[x * 3 + 1].a);
         let tempZ = atomicLoad(&tempBuffer[x * 3 + 2].a);
-    
-    
-
+        
         var newPos = vec3<f32>(0.0, 0.0, 0.0);
-
-        // var start = x * numTrianglesObject;
-        // var end = (x+1) * numTrianglesObject;
-
-        // var count = 0;
-
-        // for(var i: u32 = start; i < end; i++) {
-        //     var data = getTempBuffer(i);                        
-        //     newPos.x += data.x;
-        //     newPos.y += data.y;
-        //     newPos.z += data.z;
-        // }
-
-        // newPos.x /= f32(numTrianglesObject);
-        // newPos.y /= f32(numTrianglesObject);
-        // newPos.z /= f32(numTrianglesObject);
 
         newPos.x = pos.x + f32(tempX) / 100.0;
         newPos.y = pos.y + f32(tempY) / 100.0;
         newPos.z = pos.z + f32(tempZ) / 100.0;
     
-        var threshold:f32 = 0.000001;
+        var threshold:f32 = 0.00001;
 
         if(distance(pos,newPos) <= threshold) {
-                 
-        }else{
-            vel *= 0.3;
-
-            velocities[x*3 + 0] = vel.x;
-            velocities[x*3 + 1] = vel.y;
-            velocities[x*3 + 2] = vel.z;
-
+            return;   
         }
+        vel *= 0.3;
+
+        velocities[x*3 + 0] = vel.x;
+        velocities[x*3 + 1] = vel.y;
+        velocities[x*3 + 2] = vel.z;
         positionsCloth[x*3 + 0] = pos.x;
         positionsCloth[x*3 + 1] = pos.y;
         positionsCloth[x*3 + 2] = pos.z;    
@@ -269,6 +233,37 @@ export class IntersectionShader {
     }
 
     tritriIntersectionShader = `
+    
+    @group(0) @binding(0) var<storage, read_write> positionsCloth: array<f32>;
+    @group(0) @binding(1) var<storage, read_write> triangleCloth: array<triangles_cloth>;
+    
+    @group(0) @binding(2) var<storage, read_write> positionsObject: array<f32>;
+    @group(0) @binding(3) var<storage, read_write> triangleObject: array<triangles_object>;
+    
+    @group(0) @binding(4) var<uniform> numParticles: u32;
+    @group(0) @binding(5) var<uniform> numTrianglesObject: u32;
+
+    @group(0) @binding(6) var<storage, read_write> tempForce: array<atomicU32>;
+
+    struct atomicU32{
+        a: atomic<u32>
+    }
+
+    struct triangles_cloth{
+        v1: f32,
+        v2: f32,
+        v3: f32,
+        t1: f32,
+        t2: f32,
+        t3: f32,
+    }
+
+    struct triangles_object{
+        v1:u32,
+        v2:u32,
+        v3:u32
+    }
+    
     fn orient_2D(a: vec2<f32>, b: vec2<f32>, c: vec2<f32>) -> f32 {
         return (a.x - c.x) * (b.y - c.y) - (a.y - c.y) * (b.x - c.x);
     }

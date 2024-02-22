@@ -6,10 +6,6 @@ export class Triangle{
     v2!:number;
     v3!:number;
 
-    targetIndex1: number = 0;
-    targetIndex2: number = 0;
-    targetIndex3: number = 0;
-
     constructor(v1: number, v2: number, v3: number){
         this.v1 = v1;
         this.v2 = v2;
