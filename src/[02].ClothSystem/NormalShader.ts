@@ -3,7 +3,7 @@ export class NormalShader{
     
     @group(0) @binding(0) var<storage, read_write> positions: array<f32>;
     @group(0) @binding(1) var<storage, read_write> triangleCalculationBuffer: array<triangles>;
-    @group(0) @binding(2) var<storage, read_write> tempNormal: array<atomicU32>;
+    @group(0) @binding(2) var<storage, read_write> tempNormal: array<atomicI32>;
     @group(0) @binding(3) var<uniform> numTriangles: u32;
 
     fn getPosition(index:u32) -> vec3<f32>{
@@ -22,8 +22,8 @@ export class NormalShader{
         v3: f32,
     }
 
-    struct atomicU32{
-        value: atomic<u32>
+    struct atomicI32{
+        value: atomic<i32>
     }
 
     @compute @workgroup_size(256)
@@ -47,17 +47,17 @@ export class NormalShader{
         // Calculate the normal for this triangle
         var normal: vec3<f32> = calculateNormal(p0, p1, p2);
 
-        atomicAdd(&tempNormal[v1 * 3 + 0].value, u32(normal.x*100));
-        atomicAdd(&tempNormal[v1 * 3 + 1].value, u32(normal.y*100));
-        atomicAdd(&tempNormal[v1 * 3 + 2].value, u32(normal.z*100));
+        atomicAdd(&tempNormal[v1 * 3 + 0].value, i32(normal.x*100));
+        atomicAdd(&tempNormal[v1 * 3 + 1].value, i32(normal.y*100));
+        atomicAdd(&tempNormal[v1 * 3 + 2].value, i32(normal.z*100));
 
-        atomicAdd(&tempNormal[v2 * 3 + 0].value, u32(normal.x*100));
-        atomicAdd(&tempNormal[v2 * 3 + 1].value, u32(normal.y*100));
-        atomicAdd(&tempNormal[v2 * 3 + 2].value, u32(normal.z*100));
+        atomicAdd(&tempNormal[v2 * 3 + 0].value, i32(normal.x*100));
+        atomicAdd(&tempNormal[v2 * 3 + 1].value, i32(normal.y*100));
+        atomicAdd(&tempNormal[v2 * 3 + 2].value, i32(normal.z*100));
 
-        atomicAdd(&tempNormal[v3 * 3 + 0].value, u32(normal.x*100));
-        atomicAdd(&tempNormal[v3 * 3 + 1].value, u32(normal.y*100));
-        atomicAdd(&tempNormal[v3 * 3 + 2].value, u32(normal.z*100));
+        atomicAdd(&tempNormal[v3 * 3 + 0].value, i32(normal.x*100));
+        atomicAdd(&tempNormal[v3 * 3 + 1].value, i32(normal.y*100));
+        atomicAdd(&tempNormal[v3 * 3 + 2].value, i32(normal.z*100));
     }
     `;
 
@@ -66,7 +66,7 @@ export class NormalShader{
     }
 
     normalSummationComputeShader = `
-        @group(0) @binding(0) var<storage, read_write> tempNormal: array<atomicU32>;
+        @group(0) @binding(0) var<storage, read_write> tempNormal: array<atomicI32>;
         @group(0) @binding(1) var<storage, read_write> normal: array<f32>;
         @group(0) @binding(2) var<uniform> maxConnectedTriangle: u32;
         @group(0) @binding(3) var<uniform> numParticles: u32;
@@ -75,7 +75,7 @@ export class NormalShader{
             return vec3<f32>(normal[index*3],normal[index*3+1],normal[index*3+2]);
         }
 
-        struct atomicU32{
+        struct atomicI32{
             value: atomic<u32>
         }
 

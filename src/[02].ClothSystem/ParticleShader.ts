@@ -147,9 +147,9 @@ export class ParticleShader {
         let ambientStrength: f32 = 1.5;
         let ambientColor: vec4<f32> = vec4<f32>(0.25, 0.25, 0.25, 1.0) * ambientStrength;
         
-        let lightPos: vec3<f32> = vec3<f32>(-30.0, 30.0, 30.0);
+        let lightPos: vec3<f32> = vec3<f32>(-30.0, 100.0, 30.0);
         let lightColor: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0);
-        let lightIntensity: f32 = 3.0;
+        let lightIntensity: f32 = 1.5;
         
         let texColor: vec4<f32> = textureSample(myTexture, mySampler, TexCoord);
         
@@ -161,7 +161,7 @@ export class ParticleShader {
         let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
         let reflectDir: vec3<f32> = reflect(-lightDir, norm);
         let specularStrength: f32 = 0.45;
-        let shininess: f32 = 32.0;
+        let shininess: f32 = 256.0;
         let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
         let specular: vec4<f32> = lightColor * spec * specularStrength;
         

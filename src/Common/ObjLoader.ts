@@ -11,6 +11,7 @@ export class ObjLoader {
         var _model = new ObjModel();
         const vertexPositions: number[][] = [];
         const vertexNormals: number[][] = [];
+        const uv: number[][] = [];
         const faces: string[][] = [];
 
         objData.split('\n').forEach(line => {
@@ -22,6 +23,9 @@ export class ObjLoader {
                     break;
                 case 'vn':
                     vertexNormals.push(parts.slice(1).map(parseFloat));
+                    break;
+                case 'vt':
+                    uv.push(parts.slice(1).map(parseFloat));
                     break;
                 case 'f':
                     faces.push(parts.slice(1));
@@ -35,7 +39,7 @@ export class ObjLoader {
         faces.forEach(faceParts => {
             const faceIndices = faceParts.map(part => {
                 const [pos, tex, norm] = part.split('/').map(e => parseInt(e) - 1);
-                const key = `${pos}|${norm}`;
+                const key = `${pos}|${tex}|${norm}`;
 
                 if (indexMap.has(key)) {
                     return indexMap.get(key)!;
@@ -44,7 +48,13 @@ export class ObjLoader {
                     _model.vertices.push(...position);
 
                     // UVs를 (0, 0)으로 설정
-                    _model.uvs.push(0.01, 0.01);
+                    const _uv = uv[tex];
+                    if(_uv===undefined){
+                        _model.uvs.push(0.01, 0.01);
+                    }
+                    else{
+                        _model.uvs.push(..._uv);
+                    }
 
                     if (vertexNormals.length > 0 && norm !== undefined) {
                         const normal = vertexNormals[norm];
