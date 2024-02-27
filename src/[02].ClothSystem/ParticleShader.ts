@@ -144,7 +144,7 @@ export class ParticleShader {
         // finalColor /= 4.0;
 
         // return finalColor;
-        let ambientStrength: f32 = 1.5;
+        let ambientStrength: f32 = 0.1;
         let ambientColor: vec4<f32> = vec4<f32>(0.25, 0.25, 0.25, 1.0) * ambientStrength;
         
         let lightPos: vec3<f32> = vec3<f32>(-30.0, 100.0, 30.0);
@@ -180,6 +180,7 @@ export class ParticleShader {
     @group(0) @binding(1) var<storage, read_write> velocities: array<f32>;    
     @group(0) @binding(2) var<storage, read_write> fixed: array<u32>;
     @group(0) @binding(3) var<storage, read_write> force: array<f32>;   
+    @group(0) @binding(4) var<storage, read_write> prevPosition: array<f32>;   
 
     fn getPosition(index:u32) -> vec3<f32>{
         return vec3<f32>(positions[index*3],positions[index*3+1],positions[index*3+2]);
@@ -205,29 +206,18 @@ export class ParticleShader {
         
         var pos = getPosition(index);
         var vel = getVelocity(index);
-        var f = getForce(index);        
+        var f = getForce(index);     
+        
+        prevPosition[index*3 + 0] = pos.x;
+        prevPosition[index*3 + 1] = pos.y;
+        prevPosition[index*3 + 2] = pos.z;
         
         // floor collisions
-        if(pos.y < 0.0){
-            pos.y += 0.0001;  
-            vel *= -0.001;      
-        }
-
-        // // Sphere properties
-        // var sphereCenter: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0); // Example sphere center
-        // var sphereRadius: f32 = 10.0; // Example sphere radius
-
-        // // Collision detection and response
-        // var distanceToSphereCenter = distance(pos, sphereCenter);
-        // if(distanceToSphereCenter < sphereRadius){
-        //     // Move the particle to the surface of the sphere
-        //     var directionToCenter = normalize(sphereCenter - pos);
-        //     pos += (-directionToCenter * 0.01);
-
-        //     // Reflect velocity
+        // if(pos.y < 0.0){
+        //     pos.y += 0.0001;  
         //     vel *= -0.001;      
         // }
-        
+
         var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);
         var deltaTime: f32 = 0.0005; // Assuming 60 FPS for simplicity
 
@@ -237,6 +227,8 @@ export class ParticleShader {
         velocities[index*3 + 0] = vel.x;
         velocities[index*3 + 1] = vel.y;
         velocities[index*3 + 2] = vel.z;
+
+        
 
         positions[index*3 + 0] = pos.x;
         positions[index*3 + 1] = pos.y;

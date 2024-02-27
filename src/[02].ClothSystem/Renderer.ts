@@ -50,6 +50,7 @@ export class ClothRenderer extends RendererOrigin {
 
     //particle buffers
     private positionBuffer!: GPUBuffer;
+    private prevPositionBuffer!: GPUBuffer;
     private velocityBuffer!: GPUBuffer;
     private forceBuffer!: GPUBuffer;
     private fixedBuffer!: GPUBuffer;
@@ -100,8 +101,8 @@ export class ClothRenderer extends RendererOrigin {
 
     kD: number = 0;
 
-    xSize: number = 100.0;
-    ySize: number = 100.0;
+    xSize: number = 20.0;
+    ySize: number = 20.0;
 
     //for temp storage buffer
     maxSpringConnected: number = 0;
@@ -269,13 +270,8 @@ export class ClothRenderer extends RendererOrigin {
         this.updateSprings(commandEncoder);
         this.summationNodeForce(commandEncoder);        
         this.Intersections(commandEncoder);
-        // if(this.localFrameCount > 500 && this.localFrameCount%5===0){
-        //     this.readBackPositionBuffer();
-        // }
         this.updateParticles(commandEncoder);
         this.updateNormals(commandEncoder);
-
-
         //render pass
         this.renderCloth(commandEncoder);
 
@@ -496,18 +492,19 @@ export class ClothRenderer extends RendererOrigin {
                     binding: 7, // The binding number in the shader
                     visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
                     buffer: { type: 'storage', minBindingSize: 0 }, // Ensure this matches the shader's expectation
-                },
-                
+                },                
                 {
                     binding: 8, // The binding number in the shader
                     visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
                     buffer: { type: 'storage', minBindingSize: 0 }, // Ensure this matches the shader's expectation
                 },
+                {
+                    binding: 9, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: { type: 'storage', minBindingSize: 0 }, // Ensure this matches the shader's expectation
+                },
             ]
         });
-
-        
-
 
         const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
         
@@ -558,6 +555,10 @@ export class ClothRenderer extends RendererOrigin {
                     binding: 8,
                     resource: { buffer: this.collisionCountTempBuffer }
                 },
+                {
+                    binding: 9,
+                    resource: { buffer: this.prevPositionBuffer }
+                },
             ]
         });
     }
@@ -588,8 +589,8 @@ export class ClothRenderer extends RendererOrigin {
     }
     createParticles() {
         // N * M 그리드의 노드를 생성하는 로직
-        const start_x = (this.xSize) - 35;
-        const start_y = (this.ySize) - 30;
+        const start_x = 10;
+        const start_y = 10;
 
         const dist_x = (this.xSize / this.N);
         const dist_y = (this.ySize / this.M);
@@ -597,7 +598,7 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
                 //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), 0.0);
-                var pos = vec3.fromValues(start_x - (dist_x * j), 21.0, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x - (dist_x * j), 19.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -850,6 +851,7 @@ export class ClothRenderer extends RendererOrigin {
         const normalData = new Float32Array(this.normals.flatMap(p => [p[0], p[1], p[2]]));
 
         this.positionBuffer = makeFloat32ArrayBufferStorage(this.device, positionData);
+        this.prevPositionBuffer = makeFloat32ArrayBufferStorage(this.device, positionData);
         this.velocityBuffer = makeFloat32ArrayBufferStorage(this.device, velocityData);
         this.forceBuffer = makeFloat32ArrayBufferStorage(this.device, forceData);
         
@@ -1169,6 +1171,14 @@ export class ClothRenderer extends RendererOrigin {
                         type: 'storage',
                         minBindingSize: 0, // or specify the actual size
                     },
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: 'storage',
+                        minBindingSize: 0, // or specify the actual size
+                    },
                 }
             ],
         });
@@ -1211,6 +1221,12 @@ export class ClothRenderer extends RendererOrigin {
                     binding: 3,
                     resource: {
                         buffer: this.forceBuffer,
+                    },
+                },
+                {
+                    binding: 4,
+                    resource: {
+                        buffer: this.prevPositionBuffer,
                     },
                 }
             ],
