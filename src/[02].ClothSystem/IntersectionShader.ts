@@ -185,7 +185,7 @@ export class IntersectionShader {
     }
 
     @compute @workgroup_size(256)
-    fn summation(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    fn response(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let x: u32 = global_id.x;
         
         if(x > numParticles) {return;}
@@ -399,7 +399,8 @@ export class IntersectionShader {
         var res1 = intersect(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], tri1_vtx[0], tri1_vtx[1]);
         var res2 = intersect(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], tri1_vtx[0], tri1_vtx[2]);
         var res3 = intersect(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], tri1_vtx[1], tri1_vtx[2]);
-        let threshold = 10.0;
+        
+        if(!res1 && !res2 && !res3) { return; }
         
         if(res1 && res2)
         {

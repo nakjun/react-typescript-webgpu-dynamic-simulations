@@ -19,8 +19,8 @@ export class RendererOrigin {
 
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(-52.4, 31.2, -52.4);
-    camera_target: vec3 = vec3.fromValues(0.0, 0.0, 0.0);
+    camera_position: vec3 = vec3.fromValues(25, 32, -15);
+    camera_target: vec3 = vec3.fromValues(-5.0, 4.0, 4.0);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
     //fps
@@ -169,6 +169,8 @@ export class RendererOrigin {
         this.camPosXControl.updateDisplay();
         this.camPosYControl.updateDisplay();
         this.camPosZControl.updateDisplay();
+
+        this.printCameraValue();
     }
 
     rotateCamera(dx: number, dy: number) {
@@ -204,5 +206,11 @@ export class RendererOrigin {
         this.camera.position[2] += value;
 
         this.updateRenderOptions();
+    }
+
+    printCameraValue(){
+        console.log(this.camera.position);
+        console.log(this.camera.target);
+        console.log(this.camera.up);
     }
 }

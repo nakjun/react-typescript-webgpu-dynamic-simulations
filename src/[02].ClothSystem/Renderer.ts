@@ -208,7 +208,7 @@ export class ClothRenderer extends RendererOrigin {
         return texture;
     }
     async createAssets() {
-        const assets1 = await this.createTextureFromImage("./textures/high_knitted.jpg", this.device);
+        const assets1 = await this.createTextureFromImage("./textures/siggraph.png", this.device);
         this.texture = assets1.texture;
         this.sampler = assets1.sampler;
         this.view = assets1.view;
@@ -512,7 +512,7 @@ export class ClothRenderer extends RendererOrigin {
             layout: computePipelineLayout,
             compute: {
                 module: intersectionComputeShaderModule,
-                entryPoint: 'summation',
+                entryPoint: 'response',
             },
         });
 
@@ -597,8 +597,8 @@ export class ClothRenderer extends RendererOrigin {
 
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
-                //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), 0.0);
-                var pos = vec3.fromValues(start_x - (dist_x * j), 19.0, start_y - (dist_y * i));
+                //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), -10.0);
+                var pos = vec3.fromValues(start_x - (dist_x * j), 21.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -676,9 +676,9 @@ export class ClothRenderer extends RendererOrigin {
         this.triangleIndices = new Uint32Array(indices);
 
         //first line fix
-        // for (let i = 0; i < this.N; i++) {
-        //     this.particles[i].fixed = true;
-        // }
+        for (let i = 0; i < this.N; i++) {
+            this.particles[i].fixed = true;
+        }
         // for (let i = 0; i < this.N / 3; i++) {
         //     this.particles[i].fixed = true;
         // }
