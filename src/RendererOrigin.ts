@@ -21,6 +21,8 @@ export class RendererOrigin {
     camera!: Camera;
     camera_position: vec3 = vec3.fromValues(-1.8, 33.74, -20.90);
     camera_target: vec3 = vec3.fromValues(-2.8, 0.74, 1.09);
+    // camera_position: vec3 = vec3.fromValues(-2.4, 29.8, -38.6);
+    // camera_target: vec3 = vec3.fromValues(-0.4, 9.8, 2.38);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
     //fps

@@ -81,9 +81,9 @@ const startClothSimluation = async () => {
     });
     //sceneManager.createClothModel(2, 2, 200.0, 150.0, 1000.0, 0.5);  
     //sceneManager.createClothModel(3, 3, 500.0, 250.0, 1500.0, 0.3);
-    //sceneManager.createClothModel(80, 80, 5000.0, 1550.0, 100000.0, 0.1);
+    sceneManager.createClothModel(128, 128, 5000.0, 1550.0, 100000.0, 0.1);
     //sceneManager.createClothModel(200, 200, 10000.0, 3500.0, 65000.0, 0.1);    
-    sceneManager.createClothModel(400, 400, 15000.0, 5000.0, 95000.0, 0.001);
+    //sceneManager.createClothModel(400, 400, 15000.0, 5000.0, 95000.0, 0.001);
     //sceneManager.createClothModel(750, 750, 7000.0, 5000.0, 20000.0, 0.03);
     //sceneManager.createClothModel(850, 850, 15000.0, 9500.0, 70000.0, 0.001);
     sceneManager.createClothBuffers();

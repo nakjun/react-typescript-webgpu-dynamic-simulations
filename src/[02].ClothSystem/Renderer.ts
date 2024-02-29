@@ -308,8 +308,8 @@ export class ClothRenderer extends RendererOrigin {
         const loader = new ObjLoader();
 
         //this.model = await loader.load('./objects/skybox.obj', 10.0);
-        this.model = await loader.load('./objects/bunny.obj', 100.0);
-        //this.model = await loader.load('./objects/armadillo.obj', 30.0);
+        //this.model = await loader.load('./objects/bunny.obj', 100.0);
+        this.model = await loader.load('./objects/armadillo3.obj', 30.0);
         //this.model = await loader.load('./objects/dragon.obj', 2.0);
 
         console.log("object file load end");
@@ -589,8 +589,12 @@ export class ClothRenderer extends RendererOrigin {
     }
     createParticles() {
         // N * M 그리드의 노드를 생성하는 로직
-        const start_x = 10;
-        const start_y = 10;
+        //20x20 cloth
+        // const start_x = 10;
+        // const start_y = 10;
+
+        const start_x = 8;
+        const start_y = 7;
 
         const dist_x = (this.xSize / this.N);
         const dist_y = (this.ySize / this.M);
@@ -598,7 +602,7 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
                 //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), -10.0);
-                var pos = vec3.fromValues(start_x - (dist_x * j), 21.0, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x - (dist_x * j), 19.2, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -676,9 +680,9 @@ export class ClothRenderer extends RendererOrigin {
         this.triangleIndices = new Uint32Array(indices);
 
         //first line fix
-        for (let i = 0; i < this.N; i++) {
-            this.particles[i].fixed = true;
-        }
+        // for (let i = 0; i < this.N; i++) {
+        //     this.particles[i].fixed = true;
+        // }
         // for (let i = 0; i < this.N / 3; i++) {
         //     this.particles[i].fixed = true;
         // }
