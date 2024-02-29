@@ -272,6 +272,28 @@ export class IntersectionShader {
         return dot(delta, delta);
     }
 
+    fn compareVec3(a: vec3<i32>, b: vec3<i32>) -> bool{
+        return a.x == b.x && a.y == b.y && a.z == b.z;
+    }
+
+    fn areTriangleSameVoxel(cloth_space1: vec3<i32>, cloth_space2: vec3<i32>, cloth_space3: vec3<i32>,
+        object_space1: vec3<i32>, object_space2: vec3<i32>, object_space3: vec3<i32>) -> bool {
+
+        if(compareVec3(cloth_space1, object_space1) || compareVec3(cloth_space1, object_space2) || compareVec3(cloth_space1, object_space3))
+        {
+            return true;
+        }
+        if(compareVec3(cloth_space2, object_space1) || compareVec3(cloth_space2, object_space2) || compareVec3(cloth_space2, object_space3))
+        {
+            return true;
+        }
+        if(compareVec3(cloth_space3, object_space1) || compareVec3(cloth_space3, object_space2) || compareVec3(cloth_space3, object_space3))
+        {
+            return true;
+        }
+        return false;
+    }
+
     fn areTrianglesClose(cloth_space1: vec3<i32>, cloth_space2: vec3<i32>, cloth_space3: vec3<i32>,
         object_space1: vec3<i32>, object_space2: vec3<i32>, object_space3: vec3<i32>) -> bool {
         let minDistanceSquared = 100.0; // 충돌 검사를 할 최소 거리의 제곱값입니다. 10 단위로 10*10 = 100 입니다.
@@ -389,7 +411,7 @@ export class IntersectionShader {
         var object_space2 = calculateSpace(tri2_vtx[1]);
         var object_space3 = calculateSpace(tri2_vtx[2]);
 
-        if (!areTrianglesClose(cloth_space1, cloth_space2, cloth_space3,
+        if (!areTriangleSameVoxel(cloth_space1, cloth_space2, cloth_space3,
             object_space1, object_space2, object_space3)) {
             // 충분히 가까운 공간에 있지 않다면, 충돌 검사를 수행하지 않습니다.
             return;
