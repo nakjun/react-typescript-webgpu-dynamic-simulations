@@ -213,7 +213,7 @@ export class ClothRenderer extends RendererOrigin {
         this.sampler = assets1.sampler;
         this.view = assets1.view;
 
-        const assets2 = await this.createTextureFromImage("./textures/metal.jpg", this.device);
+        const assets2 = await this.createTextureFromImage("./textures/high_jean.jpg", this.device);
         this.textureObject = assets2.texture;
         this.samplerObject = assets2.sampler;
         this.viewObject = assets2.view;
@@ -590,11 +590,11 @@ export class ClothRenderer extends RendererOrigin {
     createParticles() {
         // N * M 그리드의 노드를 생성하는 로직
         //20x20 cloth
-        // const start_x = 10;
-        // const start_y = 10;
+        const start_x = 7;
+        const start_y = 10;
 
-        const start_x = 8;
-        const start_y = 7;
+        //const start_x = 15;
+        //const start_y = 10;
 
         const dist_x = (this.xSize / this.N);
         const dist_y = (this.ySize / this.M);
@@ -602,7 +602,7 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
                 //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), -10.0);
-                var pos = vec3.fromValues(start_x - (dist_x * j), 19.2, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x - (dist_x * j), 21.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
