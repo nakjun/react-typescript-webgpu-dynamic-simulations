@@ -47,17 +47,17 @@ export class NormalShader{
         // Calculate the normal for this triangle
         var normal: vec3<f32> = calculateNormal(p0, p1, p2);
 
-        atomicAdd(&tempNormal[v1 * 3 + 0].value, i32(normal.x*100));
-        atomicAdd(&tempNormal[v1 * 3 + 1].value, i32(normal.y*100));
-        atomicAdd(&tempNormal[v1 * 3 + 2].value, i32(normal.z*100));
+        atomicAdd(&tempNormal[v1 * 3 + 0].value, i32(normal.x*1000));
+        atomicAdd(&tempNormal[v1 * 3 + 1].value, i32(normal.y*1000));
+        atomicAdd(&tempNormal[v1 * 3 + 2].value, i32(normal.z*1000));
 
-        atomicAdd(&tempNormal[v2 * 3 + 0].value, i32(normal.x*100));
-        atomicAdd(&tempNormal[v2 * 3 + 1].value, i32(normal.y*100));
-        atomicAdd(&tempNormal[v2 * 3 + 2].value, i32(normal.z*100));
+        atomicAdd(&tempNormal[v2 * 3 + 0].value, i32(normal.x*1000));
+        atomicAdd(&tempNormal[v2 * 3 + 1].value, i32(normal.y*1000));
+        atomicAdd(&tempNormal[v2 * 3 + 2].value, i32(normal.z*1000));
 
-        atomicAdd(&tempNormal[v3 * 3 + 0].value, i32(normal.x*100));
-        atomicAdd(&tempNormal[v3 * 3 + 1].value, i32(normal.y*100));
-        atomicAdd(&tempNormal[v3 * 3 + 2].value, i32(normal.z*100));
+        atomicAdd(&tempNormal[v3 * 3 + 0].value, i32(normal.x*1000));
+        atomicAdd(&tempNormal[v3 * 3 + 1].value, i32(normal.y*1000));
+        atomicAdd(&tempNormal[v3 * 3 + 2].value, i32(normal.z*1000));
     }
     `;
 
@@ -98,9 +98,9 @@ export class NormalShader{
             atomicStore(&tempNormal[id * 3 + 1].value, i32(0));
             atomicStore(&tempNormal[id * 3 + 2].value, i32(0));
 
-            n.x = f32(tempX) / 100.0;
-            n.y = f32(tempY) / 100.0;
-            n.z = f32(tempZ) / 100.0;
+            n.x = f32(tempX) / 1000.0;
+            n.y = f32(tempY) / 1000.0;
+            n.z = f32(tempZ) / 1000.0;
 
             n = normalize(n);
 

@@ -82,6 +82,15 @@ export class ParticleShader {
     @binding(2) @group(0) var mySampler: sampler;
     @binding(3) @group(0) var<uniform> cameraPos: vec3<f32>;
     
+    struct LightData {
+        position: vec3<f32>,
+        color: vec4<f32>,
+        intensity: f32,
+        specularStrength: f32,
+        shininess: f32,
+    };
+    @binding(4) @group(0) var<uniform> lightUBO: LightData; // Light 정보 바인딩
+    
     struct VertexOutput {
         @builtin(position) Position : vec4<f32>,
         @location(0) TexCoord : vec2<f32>,
@@ -101,12 +110,12 @@ export class ParticleShader {
     
     @fragment
     fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {            
-        let ambientStrength: f32 = 0.3; // 앰비언트 강도를 낮춤
-        let ambientColor: vec4<f32> = vec4<f32>(0.65, 0.65, 0.65, 1.0) * ambientStrength; // 앰비언트 컬러를 약간 어둡게
+        let ambientStrength: f32 = 0.001; // 환경광 강도를 적절히 조절
+        let ambientColor: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0) * ambientStrength; // 환경광 색상을 자연스러운 톤으로 조정
         
-        let lightPos: vec3<f32> = vec3<f32>(0.0, 40.0, 45.0);
-        let lightColor: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0);
-        let lightIntensity: f32 = 2.0;
+        let lightPos: vec3<f32> = lightUBO.position;
+        let lightColor: vec4<f32> = lightUBO.color;
+        let lightIntensity: f32 = lightUBO.intensity;
         
         let texColor: vec4<f32> = textureSample(myTexture, mySampler, TexCoord);
         
@@ -117,10 +126,8 @@ export class ParticleShader {
         
         let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
         let reflectDir: vec3<f32> = reflect(-lightDir, norm);
-        let specularStrength: f32 = 0.8; // 경면반사 강도 조정
-        let shininess: f32 = 128.0; // 경면반사의 블러링 효과 조정
-        let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
-        let specular: vec4<f32> = lightColor * spec * specularStrength;
+        let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), lightUBO.shininess);
+        let specular: vec4<f32> = lightColor * spec * lightUBO.specularStrength;
         
         var finalColor: vec4<f32> = ambientColor + diffuse + specular;
         finalColor.a = texColor.a; // 텍스처의 알파 값을 최종 색상의 알파 값으로 설정
@@ -167,11 +174,11 @@ export class ParticleShader {
         prevPosition[index*3 + 1] = pos.y;
         prevPosition[index*3 + 2] = pos.z;
         
-        // floor collisions
-        // if(pos.y < 0.0){
-        //     pos.y += 0.0001;  
-        //     vel *= -0.001;      
-        // }
+        //floor collisions
+        if(pos.y < -18.0){
+            pos.y += 0.0001;  
+            vel *= -0.001;      
+        }
 
         var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);
         var deltaTime: f32 = 0.0005; // Assuming 60 FPS for simplicity
@@ -183,39 +190,11 @@ export class ParticleShader {
         velocities[index*3 + 1] = vel.y;
         velocities[index*3 + 2] = vel.z;
 
-        
-
         positions[index*3 + 0] = pos.x;
         positions[index*3 + 1] = pos.y;
         positions[index*3 + 2] = pos.z;
     }    
     `;
-
-    normalUpdateShader = `
-    
-    @group(0) @binding(0) var<storage, read_write> positions: array<f32>;    
-    @group(0) @binding(1) var<storage, read_write> normals: array<f32>;
-
-    fn getPosition(index:u32) -> vec3<f32>{
-        return vec3<f32>(positions[index*3],positions[index*3+1],positions[index*3+2]);
-    }
-    
-    fn getNormals(index:u32) -> vec3<f32>{
-        return vec3<f32>(normals[index*3],normals[index*3+1],normals[index*3+2]);
-    }
-
-    @compute 
-    @workgroup_size(256)
-    fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-        let index: u32 = global_id.x;
-
-        var pos = getPosition(index);
-        var normal = getNormals(index);
-    }    
-    `;
-
-
-    lineShader = ``;
 
     getParticleShader() {
         return this.particle_shader;
