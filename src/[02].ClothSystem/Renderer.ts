@@ -216,7 +216,7 @@ export class ClothRenderer extends RendererOrigin {
         return texture;
     }
     async createAssets() {
-        const assets1 = await this.createTextureFromImage("./textures/high_jean.jpg", this.device);
+        const assets1 = await this.createTextureFromImage("./textures/high_knitted.jpg", this.device);
         this.texture = assets1.texture;
         this.sampler = assets1.sampler;
         this.view = assets1.view;

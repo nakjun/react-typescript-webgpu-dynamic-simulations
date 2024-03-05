@@ -1,7 +1,5 @@
 import { mat4, vec3 } from 'gl-matrix';
 import { Camera } from './WebGPU/Camera';
-import { Shader } from './[01].ParticleSystem/Shader';
-import { Model } from './Common/Model';
 import { SystemGUI } from './GUI/GUI';
 
 export class RendererOrigin {
@@ -14,34 +12,45 @@ export class RendererOrigin {
     resolveTexture!: GPUTexture;
     pipeline!: GPURenderPipeline;
     mvpUniformBuffer!: GPUBuffer;
-
-    systemGUI!: SystemGUI;
-
+    sampleCount:number = 4;
+    
     //camera
     camera!: Camera;
     camera_position: vec3 = vec3.fromValues(59.25, 19.99, -38.80);
-    camera_target: vec3 = vec3.fromValues(9.26, -3.89, -4.74);
-    // camera_position: vec3 = vec3.fromValues(-2.4, 29.8, -38.6);
-    // camera_target: vec3 = vec3.fromValues(-0.4, 9.8, 2.38);
+    camera_target: vec3 = vec3.fromValues(9.26, -3.89, -4.74);    
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
-
+    
     //lighting
     light_position: vec3 = vec3.fromValues(40.0, 50.0, 40.0);
     light_color: vec3 = vec3.fromValues(1.0, 1.0, 1.0);
     light_intensity: number = 1.25;
     specular_strength: number = 2.0;
-    shininess: number = 64.0;
-
+    shininess: number = 256.0;
+    
     //fps
     frameCount: number = 0;
     lastTime: number = 0;
     fpsDisplay;
     localFrameCount: number = 0;
-
+    
+    //gui
+    systemGUI!: SystemGUI;
     stats = {
         fps: 0,
         ms: ""
     };
+
+    camPosXControl: any;
+    camPosYControl: any;
+    camPosZControl: any;
+
+    lightPosXControl: any;
+    lightPosYControl: any;
+    lightPosZControl: any;
+
+    lightColorXControl: any;
+    lightColorYControl: any;
+    lightColorZControl: any;
 
     renderOptions = {
         wireFrame: false,
@@ -62,36 +71,18 @@ export class RendererOrigin {
         lightIntensity: this.light_intensity,
         specularStrength: this.specular_strength,
         shininess: this.shininess,
-
     }
-
     
-
-    camPosXControl: any;
-    camPosYControl: any;
-    camPosZControl: any;
-
-    lightPosXControl: any;
-    lightPosYControl: any;
-    lightPosZControl: any;
-
-    lightColorXControl: any;
-    lightColorYControl: any;
-    lightColorZControl: any;
-
-    sampleCount:number = 4; // 예: 4x MSAA 사용
-
-
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.camera = new Camera(
-            this.camera_position, // position
-            this.camera_target, // target
-            this.camera_up, // up
-            Math.PI / 4, // fov in radians
-            this.canvas.width / this.canvas.height, // aspect ratio
-            0.1, // near
-            10000 // far
+            this.camera_position,
+            this.camera_target,
+            this.camera_up,
+            Math.PI / 4,
+            this.canvas.width / this.canvas.height,
+            0.1,
+            10000
         );
         console.log("Renderer initialized");
         this.fpsDisplay = document.getElementById('fpsDisplay');
@@ -136,7 +127,7 @@ export class RendererOrigin {
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'specularStrength', 0.0, 10.0).step(0.01).name('Specular Strength').onChange((value: number) => {
             this.specular_strength = value;
         });
-        this.systemGUI.renderOptionGui.add(this.renderOptions, 'shininess', 0.0, 1024.0).step(1).name('Shininess').onChange((value: number) => {
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'shininess', 0.0, 100000.0).step(1).name('Shininess').onChange((value: number) => {
             this.shininess = value;
         });
     }
@@ -187,36 +178,30 @@ export class RendererOrigin {
         });
     }
 
-    setCamera(camera: Camera) {
-        // Projection matrix: Perspective projection
+    setCamera(camera: Camera) {        
         const projection = mat4.create();
         mat4.perspective(projection, camera.fov, this.canvas.width / this.canvas.height, camera.near, camera.far);
-
-        // View matrix: Camera's position and orientation in the world
+        
         const view = mat4.create();
         mat4.lookAt(view, camera.position, camera.target, camera.up);
 
-        // Model matrix: For now, we can use an identity matrix if we're not transforming the particles
-        const model = mat4.create(); // No transformation to the model
+        const model = mat4.create();
 
-        // Now, update the buffer with these matrices
         this.updateUniformBuffer(model, view, projection);
     }
 
-    updateUniformBuffer(model: mat4, view: mat4, projection: mat4) {
-        // Combine the matrices into a single Float32Array
-        const data = new Float32Array(48); // 16 floats per matrix, 3 matrices
+    updateUniformBuffer(model: mat4, view: mat4, projection: mat4) {        
+        const data = new Float32Array(48);
         data.set(model);
-        data.set(view, 16); // Offset by 16 floats for the view matrix
-        data.set(projection, 32); // Offset by 32 floats for the projection matrix
+        data.set(view, 16);
+        data.set(projection, 32);
 
-        // Upload the new data to the GPU
         this.device.queue.writeBuffer(
             this.mvpUniformBuffer,
-            0, // Start at the beginning of the buffer
-            data.buffer, // The ArrayBuffer of the Float32Array
-            0, // Start at the beginning of the data
-            data.byteLength // The amount of data to write
+            0, 
+            data.buffer, 
+            0, 
+            data.byteLength 
         );
     }
 
@@ -247,14 +232,11 @@ export class RendererOrigin {
         vec3.normalize(cameraRight, cameraRight);
         vec3.normalize(cameraUp, cameraUp);
 
-        // 패닝 속도 조절을 위한 스케일 팩터
         const scale = 0.1;
 
-        // dx, dy는 마우스 이동량
         vec3.scaleAndAdd(this.camera.position, this.camera.position, cameraRight, dx * scale);
         vec3.scaleAndAdd(this.camera.position, this.camera.position, cameraUp, -dy * scale);
 
-        // 카메라 타겟도 같이 이동시켜야 패닝이 제대로 보임
         vec3.scaleAndAdd(this.camera.target, this.camera.target, cameraRight, dx * scale);
         vec3.scaleAndAdd(this.camera.target, this.camera.target, cameraUp, -dy * scale);
 
