@@ -10,6 +10,7 @@ import { NormalShader } from './NormalShader';
 
 import { ObjLoader, ObjModel } from '../Common/ObjLoader';
 import { IntersectionShader } from './IntersectionShader';
+import { ObjectShader } from './ObjectShader';
 
 export class ClothRenderer extends RendererOrigin {
 
@@ -39,6 +40,9 @@ export class ClothRenderer extends RendererOrigin {
     private computeIntersectionBindGroup!: GPUBindGroup;
     private computeIntersectionBindGroup2!: GPUBindGroup;
 
+    private computeObjectMovePipeline!: GPUComputePipeline;
+    private computeObjectMoveBindGroup!: GPUBindGroup;    
+
     private computeIntersectionSummationPipeline!: GPUComputePipeline;    
 
     //uniform buffers
@@ -67,6 +71,7 @@ export class ClothRenderer extends RendererOrigin {
     private springShader!: SpringShader;
     private normalShader!: NormalShader;
     private interesectionShader!: IntersectionShader;
+    private objectShader!: ObjectShader;
 
     //particle information
     private particles: Node[] = [];
@@ -86,6 +91,8 @@ export class ClothRenderer extends RendererOrigin {
     private view!: GPUTextureView
     private sampler!: GPUSampler
     private camPosBuffer!: GPUBuffer;
+    private lightDataBuffer!: GPUBuffer;
+
 
     numParticles: number = 0;
 
@@ -101,8 +108,8 @@ export class ClothRenderer extends RendererOrigin {
 
     kD: number = 0;
 
-    xSize: number = 20.0;
-    ySize: number = 20.0;
+    xSize: number = 70.0;
+    ySize: number = 70.0;
 
     //for temp storage buffer
     maxSpringConnected: number = 0;
@@ -145,9 +152,10 @@ export class ClothRenderer extends RendererOrigin {
         this.springShader = new SpringShader();
         this.normalShader = new NormalShader();
         this.interesectionShader = new IntersectionShader();
+        this.objectShader = new ObjectShader();
 
         this.modelGenerator = new Model();
-        this.model = new ObjModel();
+        this.model = new ObjModel();        
 
         console.log("hhh")
     }
@@ -208,18 +216,18 @@ export class ClothRenderer extends RendererOrigin {
         return texture;
     }
     async createAssets() {
-        const assets1 = await this.createTextureFromImage("./textures/siggraph.png", this.device);
+        const assets1 = await this.createTextureFromImage("./textures/high_jean.jpg", this.device);
         this.texture = assets1.texture;
         this.sampler = assets1.sampler;
         this.view = assets1.view;
 
-        const assets2 = await this.createTextureFromImage("./textures/high_jean.jpg", this.device);
+        const assets2 = await this.createTextureFromImage("./textures/metal.jpg", this.device);
         this.textureObject = assets2.texture;
         this.samplerObject = assets2.sampler;
         this.viewObject = assets2.view;
     }
     async readBackPositionBuffer() {
-        var target = this.collisionCountTempBuffer;
+        var target = this.collisionTempBuffer;
 
         // Create a GPUBuffer for reading back the data
         const readBackBuffer = this.device.createBuffer({
@@ -240,15 +248,15 @@ export class ClothRenderer extends RendererOrigin {
         const arrayBuffer = readBackBuffer.getMappedRange(0, target.size);
         const data = new Int32Array(arrayBuffer);
         // console.log("----");
-        // for (let i = 0; i < data.length; i += 3) {            
-        //     if(data[i]===0 && data[i+1]===0 && data[i+2]===0){continue;}
-        //     console.log('[', i / 3, ']vec3 Array:', [data[i], data[i + 1], data[i + 2]]);
-        // }
-
-        for (let i = 0; i < data.length; i += 1) {            
-            //if(data[i]===0 && data[i+1]===0 && data[i+2]===0){continue;}
-            console.log('[', i, '] Array:', data[i]);
+        for (let i = 0; i < data.length; i += 3) {            
+            if(data[i]===0 && data[i+1]===0 && data[i+2]===0){continue;}
+            console.log('[', i / 3, ']vec3 Array:', [data[i], data[i + 1], data[i + 2]]);
         }
+
+        // for (let i = 0; i < data.length; i += 1) {            
+        //     //if(data[i]===0 && data[i+1]===0 && data[i+2]===0){continue;}
+        //     console.log('[', i, '] Array:', data[i]);
+        // }
 
         // var res = JSON.stringify(data, undefined);
         // console.log(res);
@@ -266,12 +274,15 @@ export class ClothRenderer extends RendererOrigin {
         const commandEncoder = this.device.createCommandEncoder();
 
         //compute pass
+        this.updateObjects(commandEncoder);
         this.InitNodeForce(commandEncoder);
         this.updateSprings(commandEncoder);
         this.summationNodeForce(commandEncoder);        
         this.Intersections(commandEncoder);
+
+        
         this.updateParticles(commandEncoder);
-        this.updateNormals(commandEncoder);
+        this.updateNormals(commandEncoder);        
         //render pass
         this.renderCloth(commandEncoder);
 
@@ -335,6 +346,35 @@ export class ClothRenderer extends RendererOrigin {
         });
         new Uint32Array(this.objectNumTriangleBuffer.getMappedRange()).set(numTriangleData);
         this.objectNumTriangleBuffer.unmap();
+
+        const shaderModule = this.device.createShaderModule({ code: this.objectShader.getMoveShader() });
+        const bindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: { type: 'storage', minBindingSize: 0, },
+                },
+            ]
+        });
+
+        const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+        this.computeObjectMovePipeline = this.device.createComputePipeline({
+            layout: computePipelineLayout,
+            compute: {
+                module: shaderModule,
+                entryPoint: 'main',
+            },
+        });
+        this.computeObjectMoveBindGroup = this.device.createBindGroup({
+            layout: bindGroupLayout, // The layout created earlier
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: this.ObjectPosBuffer }
+                },
+            ]
+        });
     }
 
     createTriTriIntersectionPipeline(){
@@ -590,8 +630,8 @@ export class ClothRenderer extends RendererOrigin {
     createParticles() {
         // N * M 그리드의 노드를 생성하는 로직
         //20x20 cloth
-        const start_x = 7;
-        const start_y = 10;
+        const start_x = 30;
+        const start_y = 35;
 
         //const start_x = 15;
         //const start_y = 10;
@@ -602,7 +642,7 @@ export class ClothRenderer extends RendererOrigin {
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
                 //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), -10.0);
-                var pos = vec3.fromValues(start_x - (dist_x * j), 21.0, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x - (dist_x * j), 16.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -1514,7 +1554,7 @@ export class ClothRenderer extends RendererOrigin {
             },
         });
     }
-    createTrianglePipeline(render_type: string = 'triangle-list') {
+    createTrianglePipeline() {
         const textureShaderModule = this.device.createShaderModule({ code: this.particleShader.getTextureShader() });
         const bindGroupLayout = this.device.createBindGroupLayout({
             entries: [
@@ -1540,7 +1580,19 @@ export class ClothRenderer extends RendererOrigin {
                         type: 'uniform',
                     }
                 },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'uniform',
+                    }
+                },
             ]
+        });
+
+        this.lightDataBuffer = this.device.createBuffer({
+            size: 48, // vec3 position (12 bytes) + padding (4 bytes) + vec4 color (16 bytes) + intensity (4 bytes)
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
         this.triangleBindGroup = this.device.createBindGroup({
@@ -1564,6 +1616,12 @@ export class ClothRenderer extends RendererOrigin {
                     binding: 3,
                     resource: {
                         buffer: this.camPosBuffer
+                    }
+                },
+                {
+                    binding: 4,
+                    resource: {
+                        buffer: this.lightDataBuffer
                     }
                 }
             ]
@@ -1590,6 +1648,12 @@ export class ClothRenderer extends RendererOrigin {
                     binding: 3,
                     resource: {
                         buffer: this.camPosBuffer
+                    }
+                },
+                {
+                    binding: 4,
+                    resource: {
+                        buffer: this.lightDataBuffer
                     }
                 }
             ]
@@ -1713,6 +1777,11 @@ export class ClothRenderer extends RendererOrigin {
         computePass.dispatchWorkgroups(Math.ceil(this.triangleIndices.length / 16.0) + 1, (this.objectIndicesLength / 3) / 16.0 + 1, 1);
         computePass.end();
 
+        
+        if(this.localFrameCount%50===0){
+            this.readBackPositionBuffer();
+        }
+
         const computePass2 = commandEncoder.beginComputePass();
         computePass2.setPipeline(this.computeIntersectionSummationPipeline);
         computePass2.setBindGroup(0, this.computeIntersectionBindGroup2);
@@ -1720,13 +1789,28 @@ export class ClothRenderer extends RendererOrigin {
         computePass2.end();
     }
 
+    updateObjects(commandEncoder: GPUCommandEncoder){
+        if(this.renderOptions.moveObject){
+            const computePass = commandEncoder.beginComputePass();
+            computePass.setPipeline(this.computeObjectMovePipeline);
+            computePass.setBindGroup(0, this.computeObjectMoveBindGroup);
+            computePass.dispatchWorkgroups(Math.ceil(this.model.vertices.length / 256.0) + 1, 1, 1);
+            computePass.end();
+        }
+    }
+
     renderCloth(commandEncoder: GPUCommandEncoder) {
         const passEncoder = commandEncoder.beginRenderPass(this.renderPassDescriptor);
+        
         this.device.queue.writeBuffer(
             this.camPosBuffer,
             0,
             new Float32Array([...this.camera.position, 1.0]) // vec3 + padding
         );
+
+        let lightData = [this.light_position[0], this.light_position[1], this.light_position[2], 0.0, this.light_color[0], this.light_color[1], this.light_color[2], 1.0, this.light_intensity, this.specular_strength, this.shininess, 0.0];
+        this.device.queue.writeBuffer(this.lightDataBuffer, 0, new Float32Array(lightData));
+        
         if(this.renderOptions.renderObject){
             passEncoder.setPipeline(this.trianglePipeline);
             passEncoder.setVertexBuffer(0, this.ObjectPosBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라

@@ -19,11 +19,18 @@ export class RendererOrigin {
 
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(-3.98, 32.79, -55.39);
-    camera_target: vec3 = vec3.fromValues(-5.0, -0.2, 0.49);
+    camera_position: vec3 = vec3.fromValues(59.25, 19.99, -38.80);
+    camera_target: vec3 = vec3.fromValues(9.26, -3.89, -4.74);
     // camera_position: vec3 = vec3.fromValues(-2.4, 29.8, -38.6);
     // camera_target: vec3 = vec3.fromValues(-0.4, 9.8, 2.38);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
+
+    //lighting
+    light_position: vec3 = vec3.fromValues(40.0, 50.0, 40.0);
+    light_color: vec3 = vec3.fromValues(1.0, 1.0, 1.0);
+    light_intensity: number = 1.25;
+    specular_strength: number = 2.0;
+    shininess: number = 64.0;
 
     //fps
     frameCount: number = 0;
@@ -42,11 +49,35 @@ export class RendererOrigin {
         camPosY: this.camera_position[1],
         camPosZ: this.camera_position[2],
         renderObject: true,
+        moveObject: false,
+
+        lightPosX: this.light_position[0],
+        lightPosY: this.light_position[1],
+        lightPosZ: this.light_position[2],
+
+        lightColorX: this.light_color[0],
+        lightColorY: this.light_color[1],
+        lightColorZ: this.light_color[2],
+
+        lightIntensity: this.light_intensity,
+        specularStrength: this.specular_strength,
+        shininess: this.shininess,
+
     }
+
+    
 
     camPosXControl: any;
     camPosYControl: any;
     camPosZControl: any;
+
+    lightPosXControl: any;
+    lightPosYControl: any;
+    lightPosZControl: any;
+
+    lightColorXControl: any;
+    lightColorYControl: any;
+    lightColorZControl: any;
 
     sampleCount:number = 4; // 예: 4x MSAA 사용
 
@@ -71,17 +102,43 @@ export class RendererOrigin {
 
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'wireFrame').name('WireFrame');        
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'renderObject').name('renderObject');
-        this.camPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosX', -100, 100).name('Camera Position X').onChange((value: number) => {
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'moveObject').name('moveObject');
+        this.camPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosX', -500, 500).name('Camera Position X').onChange((value: number) => {
             this.camera.position[0] = value;
         });
-        this.camPosYControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosY', -100, 100).name('Camera Position Y').onChange((value: number) => {
+        this.camPosYControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosY', -500, 500).name('Camera Position Y').onChange((value: number) => {
             this.camera.position[1] = value;
         });
-        this.camPosZControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosZ', -100, 100).name('Camera Position Z').onChange((value: number) => {
+        this.camPosZControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosZ', -500, 500).name('Camera Position Z').onChange((value: number) => {
             this.camera.position[2] = value;
         });
-
-
+        this.lightPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightPosX', -500, 500).name('Light Position X').onChange((value: number) => {
+            this.light_position[0] = value;
+        });
+        this.lightPosYControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightPosY', -500, 500).name('Light Position Y').onChange((value: number) => {
+            this.light_position[1] = value;
+        });
+        this.lightPosZControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightPosZ', -500, 500).name('Light Position Z').onChange((value: number) => {
+            this.light_position[2] = value;
+        });
+        this.lightColorXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightColorX', 0.0, 1.0).step(0.01).name('Light Color X').onChange((value: number) => {
+            this.light_color[0] = value;
+        });
+        this.lightColorYControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightColorY', 0.0, 1.0).step(0.01).name('Light Color Y').onChange((value: number) => {
+            this.light_color[1] = value;
+        });
+        this.lightColorZControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightColorZ', 0.0, 1.0).step(0.01).name('Light Color Z').onChange((value: number) => {
+            this.light_color[2] = value;
+        });
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightIntensity', 0.0, 10.0).step(0.01).name('Light Intensity').onChange((value: number) => {
+            this.light_intensity = value;
+        });
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'specularStrength', 0.0, 10.0).step(0.01).name('Specular Strength').onChange((value: number) => {
+            this.specular_strength = value;
+        });
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'shininess', 0.0, 1024.0).step(1).name('Shininess').onChange((value: number) => {
+            this.shininess = value;
+        });
     }
 
     async init() {

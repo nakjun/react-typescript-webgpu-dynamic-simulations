@@ -196,11 +196,21 @@ export class IntersectionShader {
         var pos = getPrevPosition(x);        
         var vel = getClothVertexVelocity(x);
 
+        let tempX = atomicLoad(&tempBuffer[x * 3 + 0].value);
+        let tempY = atomicLoad(&tempBuffer[x * 3 + 1].value);
+        let tempZ = atomicLoad(&tempBuffer[x * 3 + 2].value);
         let countBufferData = atomicLoad(&tempCountBuffer[x].value);
-        if(countBufferData==1)
+
+        var separatePos:vec3<f32> = vec3<f32>((f32(tempX) / 100.0) / f32(countBufferData), (f32(tempY) / 100.0) / f32(countBufferData), (f32(tempZ) / 100.0) / f32(countBufferData));        
+
+        if(countBufferData>0)
         {
-            vel *= -0.5;
+            vel *= -0.0001;
             
+            pos.x += (separatePos.x * 0.0005);
+            pos.y += (separatePos.y * 0.0005);
+            pos.z += (separatePos.z * 0.0005);
+
             velocities[x*3 + 0] = vel.x;
             velocities[x*3 + 1] = vel.y;
             velocities[x*3 + 2] = vel.z;
@@ -208,9 +218,24 @@ export class IntersectionShader {
             positionsCloth[x*3 + 0] = pos.x;
             positionsCloth[x*3 + 1] = pos.y;
             positionsCloth[x*3 + 2] = pos.z;
-        }     
+        }
+        // if(countBufferData>0)
+        // {
+        //     vel *= -0.5;
+            
+        //     velocities[x*3 + 0] = vel.x;
+        //     velocities[x*3 + 1] = vel.y;
+        //     velocities[x*3 + 2] = vel.z;
+
+        //     positionsCloth[x*3 + 0] = pos.x;
+        //     positionsCloth[x*3 + 1] = pos.y;
+        //     positionsCloth[x*3 + 2] = pos.z;
+        // }      
     
         atomicStore(&tempCountBuffer[x].value, i32(0));
+        atomicStore(&tempBuffer[x*3+0].value, i32(0));
+        atomicStore(&tempBuffer[x*3+1].value, i32(0));
+        atomicStore(&tempBuffer[x*3+2].value, i32(0));
     }
     `;
 
@@ -264,7 +289,7 @@ export class IntersectionShader {
     }
 
     fn calculateSpace(position: vec3<f32>) -> vec3<i32> {        
-        return vec3<i32>(i32((position.x + 500.0) / 10.0), i32((position.y + 500.0) / 10.0), i32((position.z + 500.0) / 10.0));
+        return vec3<i32>(i32((position.x + 500.0) / 5.0), i32((position.y + 500.0) / 5.0), i32((position.z + 500.0) / 5.0));
     }
 
     fn distanceSquared(a: vec3<i32>, b: vec3<i32>) -> f32 {
@@ -320,12 +345,39 @@ export class IntersectionShader {
         return normalize(p1 - p0);
     }
 
-    fn intersect(p0: vec3<f32>, p1: vec3<f32>, p2: vec3<f32>, src: vec3<f32>, dst: vec3<f32>) -> bool
+    fn isPointInsideTriangle(point: vec3<f32>, vertex0: vec3<f32>, vertex1: vec3<f32>, vertex2: vec3<f32>) -> bool {
+        let normal = cross(vertex1 - vertex0, vertex2 - vertex0);
+        let edge1 = vertex1 - vertex0;
+        let vp1 = point - vertex0;
+        if (dot(cross(edge1, vp1), normal) < 0.0) {
+            return false;
+        }
+        let edge2 = vertex2 - vertex1;
+        let vp2 = point - vertex1;
+        if (dot(cross(edge2, vp2), normal) < 0.0) {
+            return false;
+        }
+        let edge3 = vertex0 - vertex2;
+        let vp3 = point - vertex2;
+        if (dot(cross(edge3, vp3), normal) < 0.0) {
+            return false;
+        }
+        return true;
+    }
+
+    struct CollisionResult {
+        hit: bool,
+        point: vec3<f32>,
+    };
+
+    fn intersect(p0: vec3<f32>, p1: vec3<f32>, p2: vec3<f32>, src: vec3<f32>, dst: vec3<f32>) -> CollisionResult
     {
         let e1 = p1 - p0;
         let e2 = p2 - p0;
 
         let epsilon = 0.000001;
+
+        var hit = vec3<f32>(0.0, 0.0, 0.0);
 
         var ray_direction = direction(src, dst);
         var ray_origin = src;
@@ -338,7 +390,15 @@ export class IntersectionShader {
     
         // If determinant is near zero, ray lies in plane of triangle otherwise not
         if (det > -epsilon && det < epsilon) {
-            return false;
+            // var c1 = isPointInsideTriangle(src, p0, p1, p2);
+            // var c2 = isPointInsideTriangle(dst, p0, p1, p2);
+
+            // if(c1) {hit = src;}
+            // if(c2) {hit = dst;}
+
+            // return CollisionResult(c1 || c2, hit);
+
+            return CollisionResult(false, hit);
         }
         let invDet: f32 = 1.0 / det;
     
@@ -350,7 +410,7 @@ export class IntersectionShader {
     
         // Check for ray hit
         if (u < 0.0 || u > 1.0) {
-            return false;
+            return CollisionResult(false, hit);
         }
     
         // Prepare to test v parameter
@@ -361,19 +421,43 @@ export class IntersectionShader {
     
         // Check for ray hit
         if (v < 0.0 || u + v > 1.0) {
-            return false;
+            return CollisionResult(false, hit);
         }
     
         // Intersection point
-        // hit = p1 + u * e1 + v * e2;
+        hit = p1 + u * e1 + v * e2;
     
         if (dot(e2, q) * invDet > epsilon) {
             // Ray does intersect
-            return true;
+            return CollisionResult(true, hit);
         }
     
         // No hit at all
-        return false;
+        return CollisionResult(false, hit);
+    }
+
+    fn FindClosestVertex(p0:vec3<f32>,p1:vec3<f32>,p2:vec3<f32>,point:vec3<f32>) -> vec3<f32>{
+        var minDistance: f32 = 1e10; // Simulating Mathf.Infinity
+        var closestVertex: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+        
+        let distance0 = distance(p0, point);
+        let distance1 = distance(p1, point);
+        let distance2 = distance(p2, point);
+
+        if (distance0 < minDistance) {
+            minDistance = distance0;
+            closestVertex = p0;
+        }
+        if (distance1 < minDistance) {
+            minDistance = distance1;
+            closestVertex = p1;
+        }
+        if (distance2 < minDistance) {
+            minDistance = distance2;
+            closestVertex = p2;
+        }
+
+        return closestVertex;
     }
 
     @compute @workgroup_size(16, 16, 1)
@@ -418,24 +502,98 @@ export class IntersectionShader {
         }
 
         //var result = tri_tri_overlap_3D(f1, f2, tri1_vtx, tri2_vtx);
+
         var res1 = intersect(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], tri1_vtx[0], tri1_vtx[1]);
         var res2 = intersect(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], tri1_vtx[0], tri1_vtx[2]);
         var res3 = intersect(tri2_vtx[0], tri2_vtx[1], tri2_vtx[2], tri1_vtx[1], tri1_vtx[2]);
+        var collisionPoint:vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
+        if(!res1.hit && !res2.hit && !res3.hit) { return; }
         
-        if(!res1 && !res2 && !res3) { return; }
+        var count:i32 = 0;
+        if(res1.hit) {
+            collisionPoint += res1.point;
+            count += 1;
+        }
+        if(res2.hit) {
+            collisionPoint += res2.point;
+            count += 1;
+        }
+        if(res3.hit) {
+            collisionPoint += res3.point;
+            count += 1;
+        }
+
+        collisionPoint = collisionPoint / f32(count);
+               
+        var closestVertex = FindClosestVertex(tri1_vtx[0], tri1_vtx[1], tri1_vtx[2], collisionPoint);
+        var separationVector = normalize(closestVertex - collisionPoint) * 0.0001;
+        if(closestVertex.x==tri1_vtx[0].x && closestVertex.y==tri1_vtx[0].y && closestVertex.z==tri1_vtx[0].z)
+        {
+            atomicAdd(&tempBuffer[f1.x * 3 + 0].value, i32(collisionPoint.x * 100.0));
+            atomicAdd(&tempBuffer[f1.x * 3 + 1].value, i32(collisionPoint.y * 100.0));
+            atomicAdd(&tempBuffer[f1.x * 3 + 2].value, i32(collisionPoint.z * 100.0));
+            atomicAdd(&tempCountBuffer[f1.x].value,i32(1));        
+        }
+        else if(closestVertex.x==tri1_vtx[1].x && closestVertex.y==tri1_vtx[1].y && closestVertex.z==tri1_vtx[1].z)
+        {
+            atomicAdd(&tempBuffer[f1.y * 3 + 0].value, i32(collisionPoint.x * 100.0));
+            atomicAdd(&tempBuffer[f1.y * 3 + 1].value, i32(collisionPoint.y * 100.0));
+            atomicAdd(&tempBuffer[f1.y * 3 + 2].value, i32(collisionPoint.z * 100.0));
+            atomicAdd(&tempCountBuffer[f1.y].value,i32(1));
+        }
+        else if(closestVertex.x==tri1_vtx[2].x && closestVertex.y==tri1_vtx[2].y && closestVertex.z==tri1_vtx[2].z)
+        {            
+            atomicAdd(&tempBuffer[f1.z * 3 + 0].value, i32(collisionPoint.x * 100.0));
+            atomicAdd(&tempBuffer[f1.z * 3 + 1].value, i32(collisionPoint.y * 100.0));
+            atomicAdd(&tempBuffer[f1.z * 3 + 2].value, i32(collisionPoint.z * 100.0));
+            atomicAdd(&tempCountBuffer[f1.z].value,i32(1));
+        }
         
-        if(res1 && res2)
-        {
-            atomicStore(&tempCountBuffer[f1.x].value,i32(1));
-        }
-        if(res1 && res3)
-        {
-            atomicStore(&tempCountBuffer[f1.y].value,i32(1));
-        }
-        if(res2 && res3)
-        {
-            atomicStore(&tempCountBuffer[f1.z].value,i32(1));
-        }        
+        // if(res1.hit && res2.hit)
+        // {
+        //     var dir1 = normalize(tri1_vtx[0]-res1.point);
+        //     var dir2 = normalize(tri1_vtx[0]-res2.point);
+
+        //     var rPoints1 = res1.point + res1.point * dir1;
+        //     var rPoints2 = res2.point + res2.point * dir2;
+
+        //     var diff = (rPoints1 + rPoints2) / 2.0;
+
+        //     atomicAdd(&tempBuffer[f1.x * 3 + 0].value, i32(diff.x * 100.0));
+        //     atomicAdd(&tempBuffer[f1.x * 3 + 1].value, i32(diff.y * 100.0));
+        //     atomicAdd(&tempBuffer[f1.x * 3 + 2].value, i32(diff.z * 100.0));
+        //     atomicAdd(&tempCountBuffer[f1.x].value,i32(1));
+        // }
+        // if(res1.hit && res3.hit)
+        // {
+        //     var dir1 = normalize(tri1_vtx[1]-res1.point);
+        //     var dir2 = normalize(tri1_vtx[1]-res3.point);
+
+        //     var rPoints1 = res1.point + res1.point * dir1;
+        //     var rPoints2 = res3.point + res3.point * dir2;
+
+        //     var diff = (rPoints1 + rPoints2) / 2.0;
+
+        //     atomicAdd(&tempBuffer[f1.y * 3 + 0].value, i32(diff.x * 100.0));
+        //     atomicAdd(&tempBuffer[f1.y * 3 + 1].value, i32(diff.y * 100.0));
+        //     atomicAdd(&tempBuffer[f1.y * 3 + 2].value, i32(diff.z * 100.0));
+        //     atomicAdd(&tempCountBuffer[f1.y].value,i32(1));
+        // }
+        // if(res2.hit && res3.hit)
+        // {
+        //     var dir1 = normalize(tri1_vtx[2]-res2.point);
+        //     var dir2 = normalize(tri1_vtx[2]-res3.point);
+
+        //     var rPoints1 = res2.point + res2.point * dir1;
+        //     var rPoints2 = res3.point + res3.point * dir2;
+
+        //     var diff = (rPoints1 + rPoints2) / 2.0;
+
+        //     atomicAdd(&tempBuffer[f1.z * 3 + 0].value, i32(diff.x * 100.0));
+        //     atomicAdd(&tempBuffer[f1.z * 3 + 1].value, i32(diff.y * 100.0));
+        //     atomicAdd(&tempBuffer[f1.z * 3 + 2].value, i32(diff.z * 100.0));
+        //     atomicAdd(&tempCountBuffer[f1.z].value,i32(1));
+        // }        
     }
     `;
 }
