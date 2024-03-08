@@ -275,7 +275,7 @@ export class ClothRenderer extends RendererOrigin {
         const commandEncoder = this.device.createCommandEncoder();
 
         if (this.renderOptions.wind) {
-            const newExternalForce = new Float32Array([0.0, 10.0, 1000.0]);
+            const newExternalForce = new Float32Array([0.0, 0.0, 20.0]);
             this.device.queue.writeBuffer(
                 this.externalForceBuffer,
                 0, // Buffer 내에서의 시작 위치
