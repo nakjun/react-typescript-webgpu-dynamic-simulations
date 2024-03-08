@@ -16,16 +16,16 @@ export class RendererOrigin {
     
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(59.25, 19.99, -38.80);
-    camera_target: vec3 = vec3.fromValues(9.26, -3.89, -4.74);    
+    camera_position: vec3 = vec3.fromValues(67.8, 45.28, -52);
+    camera_target: vec3 = vec3.fromValues(-0.13, 8.48, -1.76);    
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
     
     //lighting
-    light_position: vec3 = vec3.fromValues(40.0, 50.0, 40.0);
+    light_position: vec3 = vec3.fromValues(20.0, 150.0, -20);
     light_color: vec3 = vec3.fromValues(1.0, 1.0, 1.0);
-    light_intensity: number = 1.25;
-    specular_strength: number = 2.0;
-    shininess: number = 256.0;
+    light_intensity: number = 1.3;
+    specular_strength: number = 1.5;
+    shininess: number = 2048.0;
     
     //fps
     frameCount: number = 0;
@@ -59,6 +59,7 @@ export class RendererOrigin {
         camPosZ: this.camera_position[2],
         renderObject: true,
         moveObject: false,
+        clothAlpha: false,
 
         lightPosX: this.light_position[0],
         lightPosY: this.light_position[1],
@@ -94,6 +95,7 @@ export class RendererOrigin {
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'wireFrame').name('WireFrame');        
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'renderObject').name('renderObject');
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'moveObject').name('moveObject');
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'clothAlpha').name('Alpha Change');
         this.camPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosX', -500, 500).name('Camera Position X').onChange((value: number) => {
             this.camera.position[0] = value;
         });

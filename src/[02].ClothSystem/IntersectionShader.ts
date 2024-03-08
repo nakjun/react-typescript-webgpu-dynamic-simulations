@@ -207,9 +207,9 @@ export class IntersectionShader {
         {
             vel *= -0.0001;
             
-            pos.x += (separatePos.x * 0.0005);
-            pos.y += (separatePos.y * 0.0005);
-            pos.z += (separatePos.z * 0.0005);
+            pos.x += (separatePos.x * 0.0003);
+            pos.y += (separatePos.y * 0.0003);
+            pos.z += (separatePos.z * 0.0003);
 
             velocities[x*3 + 0] = vel.x;
             velocities[x*3 + 1] = vel.y;
