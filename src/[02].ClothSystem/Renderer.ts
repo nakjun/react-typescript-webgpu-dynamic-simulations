@@ -60,6 +60,7 @@ export class ClothRenderer extends RendererOrigin {
     private forceBuffer!: GPUBuffer;
     private fixedBuffer!: GPUBuffer;
     private vertexNormalBuffer!: GPUBuffer;
+    private externalForceBuffer!: GPUBuffer;
 
     //spring buffers
     private springRenderBuffer!: GPUBuffer;
@@ -272,6 +273,17 @@ export class ClothRenderer extends RendererOrigin {
         this.makeRenderpassDescriptor();
 
         const commandEncoder = this.device.createCommandEncoder();
+
+        if (this.renderOptions.wind) {
+            const newExternalForce = new Float32Array([0.0, 10.0, 1000.0]);
+            this.device.queue.writeBuffer(
+                this.externalForceBuffer,
+                0, // Buffer 내에서의 시작 위치
+                newExternalForce.buffer, // 새로운 데이터
+                newExternalForce.byteOffset,
+                newExternalForce.byteLength
+            );
+        }
 
         //compute pass
         this.updateObjects(commandEncoder);
@@ -896,9 +908,9 @@ export class ClothRenderer extends RendererOrigin {
         this.triangleIndices = new Uint32Array(indices);
 
         //first line fix
-        for (let i = 0; i < this.N; i++) {
-            this.particles[i].fixed = true;
-        }
+        // for (let i = 0; i < this.N; i++) {
+        //     this.particles[i].fixed = true;
+        // }
         // for (let i = 0; i < this.N / 3; i++) {
         //     this.particles[i].fixed = true;
         // }
@@ -1395,9 +1407,28 @@ export class ClothRenderer extends RendererOrigin {
                         type: 'storage',
                         minBindingSize: 0, // or specify the actual size
                     },
-                }
+                },
+                {
+                    binding: 5, // This matches @group(0) @binding(5) in the WGSL shader
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: 'uniform',
+                        minBindingSize: 0, // Specify the size of vec3<f32>
+                    },
+                },
             ],
         });
+
+        const initialExternalForce = new Float32Array([0.0, 0.0, 0.0]);
+
+        // externalForceBuffer 생성
+        this.externalForceBuffer = this.device.createBuffer({
+            size: initialExternalForce.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        new Float32Array(this.externalForceBuffer.getMappedRange()).set(initialExternalForce);
+        this.externalForceBuffer.unmap();
 
         // Use the bind group layout to create a pipeline layout
         const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
@@ -1444,7 +1475,13 @@ export class ClothRenderer extends RendererOrigin {
                     resource: {
                         buffer: this.prevPositionBuffer,
                     },
-                }
+                },
+                {
+                    binding: 5,
+                    resource: {
+                        buffer: this.externalForceBuffer,
+                    },
+                },
             ],
         });
     }
@@ -2027,12 +2064,6 @@ export class ClothRenderer extends RendererOrigin {
             passEncoder.draw(this.N * this.M); // Draw the cube using the index count
         }
         else {
-
-            var alpha = 1.0;
-            if (this.renderOptions.clothAlpha) alpha = 0.5;
-
-            this.device.queue.writeBuffer(this.alphaValueBuffer, 0, new Float32Array(alpha));
-
             passEncoder.setPipeline(this.trianglePipeline);
             passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
             passEncoder.setVertexBuffer(1, this.uvBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라

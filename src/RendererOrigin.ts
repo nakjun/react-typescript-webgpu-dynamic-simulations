@@ -12,27 +12,27 @@ export class RendererOrigin {
     resolveTexture!: GPUTexture;
     pipeline!: GPURenderPipeline;
     mvpUniformBuffer!: GPUBuffer;
-    sampleCount:number = 4;
-    
+    sampleCount: number = 4;
+
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(67.8, 45.28, -52);
-    camera_target: vec3 = vec3.fromValues(-0.13, 8.48, -1.76);    
+    camera_position: vec3 = vec3.fromValues(100, 25, -30);
+    camera_target: vec3 = vec3.fromValues(-0.13, 8.48, -1.76);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
-    
+
     //lighting
     light_position: vec3 = vec3.fromValues(20.0, 150.0, -20);
     light_color: vec3 = vec3.fromValues(1.0, 1.0, 1.0);
-    light_intensity: number = 1.3;
+    light_intensity: number = 0.65;
     specular_strength: number = 1.5;
     shininess: number = 2048.0;
-    
+
     //fps
     frameCount: number = 0;
     lastTime: number = 0;
     fpsDisplay;
     localFrameCount: number = 0;
-    
+
     //gui
     systemGUI!: SystemGUI;
     stats = {
@@ -59,7 +59,7 @@ export class RendererOrigin {
         camPosZ: this.camera_position[2],
         renderObject: true,
         moveObject: false,
-        clothAlpha: false,
+        wind: false,
 
         lightPosX: this.light_position[0],
         lightPosY: this.light_position[1],
@@ -73,7 +73,7 @@ export class RendererOrigin {
         specularStrength: this.specular_strength,
         shininess: this.shininess,
     }
-    
+
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.camera = new Camera(
@@ -92,10 +92,10 @@ export class RendererOrigin {
         this.systemGUI.performanceGui.add(this.stats, 'ms').name('ms').listen();
         this.systemGUI.performanceGui.add(this.stats, 'fps').name('fps').listen();
 
-        this.systemGUI.renderOptionGui.add(this.renderOptions, 'wireFrame').name('WireFrame');        
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'wireFrame').name('WireFrame');
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'renderObject').name('renderObject');
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'moveObject').name('moveObject');
-        this.systemGUI.renderOptionGui.add(this.renderOptions, 'clothAlpha').name('Alpha Change');
+        this.systemGUI.renderOptionGui.add(this.renderOptions, 'wind').name('Apply Wind');
         this.camPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosX', -500, 500).name('Camera Position X').onChange((value: number) => {
             this.camera.position[0] = value;
         });
@@ -152,8 +152,8 @@ export class RendererOrigin {
         this.printDeviceLimits();
 
     }
-    printDeviceLimits(){
-        const limits:GPUSupportedLimits = this.device.limits;
+    printDeviceLimits() {
+        const limits: GPUSupportedLimits = this.device.limits;
         this.systemGUI.gpuDeviceGui.add(limits, 'maxComputeWorkgroupSizeX').name('Max Compute Workgroup Size X');
         this.systemGUI.gpuDeviceGui.add(limits, 'maxComputeWorkgroupSizeY').name('Max Compute Workgroup Size Y');
         this.systemGUI.gpuDeviceGui.add(limits, 'maxComputeWorkgroupSizeZ').name('Max Compute Workgroup Size Z');
@@ -180,10 +180,10 @@ export class RendererOrigin {
         });
     }
 
-    setCamera(camera: Camera) {        
+    setCamera(camera: Camera) {
         const projection = mat4.create();
         mat4.perspective(projection, camera.fov, this.canvas.width / this.canvas.height, camera.near, camera.far);
-        
+
         const view = mat4.create();
         mat4.lookAt(view, camera.position, camera.target, camera.up);
 
@@ -192,7 +192,7 @@ export class RendererOrigin {
         this.updateUniformBuffer(model, view, projection);
     }
 
-    updateUniformBuffer(model: mat4, view: mat4, projection: mat4) {        
+    updateUniformBuffer(model: mat4, view: mat4, projection: mat4) {
         const data = new Float32Array(48);
         data.set(model);
         data.set(view, 16);
@@ -200,10 +200,10 @@ export class RendererOrigin {
 
         this.device.queue.writeBuffer(
             this.mvpUniformBuffer,
-            0, 
-            data.buffer, 
-            0, 
-            data.byteLength 
+            0,
+            data.buffer,
+            0,
+            data.byteLength
         );
     }
 
@@ -251,7 +251,7 @@ export class RendererOrigin {
         this.updateRenderOptions();
     }
 
-    printCameraValue(){
+    printCameraValue() {
         console.log(this.camera.position);
         console.log(this.camera.target);
         console.log(this.camera.up);

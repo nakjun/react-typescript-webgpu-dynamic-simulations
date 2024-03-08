@@ -1,4 +1,4 @@
-export class ObjectShader{
+export class ObjectShader {
     moveComputeShader = `
     
     @group(0) @binding(0) var<storage, read_write> positions: array<f32>;
@@ -21,7 +21,7 @@ export class ObjectShader{
     }    
     `;
 
-    getMoveShader(){
+    getMoveShader() {
         return this.moveComputeShader;
     }
 
@@ -91,7 +91,7 @@ export class ObjectShader{
     }
     `;
 
-    getMaterialShader(){
+    getMaterialShader() {
         return this.materialShader;
     }
 }
