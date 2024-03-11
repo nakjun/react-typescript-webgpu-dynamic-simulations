@@ -207,9 +207,9 @@ export class IntersectionShader {
         {
             vel *= -0.0001;
             
-            pos.x += (separatePos.x * 0.0003);
-            pos.y += (separatePos.y * 0.0003);
-            pos.z += (separatePos.z * 0.0003);
+            pos.x += (separatePos.x * 0.03);
+            pos.y += (separatePos.y * 0.03);
+            pos.z += (separatePos.z * 0.03);
 
             velocities[x*3 + 0] = vel.x;
             velocities[x*3 + 1] = vel.y;
@@ -526,26 +526,28 @@ export class IntersectionShader {
         collisionPoint = collisionPoint / f32(count);
                
         var closestVertex = FindClosestVertex(tri1_vtx[0], tri1_vtx[1], tri1_vtx[2], collisionPoint);
-        var separationVector = normalize(closestVertex - collisionPoint) * 0.0001;
+        var triNormal = (tri1_vtx[0] + tri1_vtx[1] + tri1_vtx[2]) / 3.0;
+        //var separationVector = normalize(closestVertex - collisionPoint) * 0.0001 + triNormal * 0.0001;
+        var separationVector = triNormal * 0.07;
         if(closestVertex.x==tri1_vtx[0].x && closestVertex.y==tri1_vtx[0].y && closestVertex.z==tri1_vtx[0].z)
         {
-            atomicAdd(&tempBuffer[f1.x * 3 + 0].value, i32(collisionPoint.x * 100.0));
-            atomicAdd(&tempBuffer[f1.x * 3 + 1].value, i32(collisionPoint.y * 100.0));
-            atomicAdd(&tempBuffer[f1.x * 3 + 2].value, i32(collisionPoint.z * 100.0));
+            atomicAdd(&tempBuffer[f1.x * 3 + 0].value, i32(separationVector.x * 100.0));
+            atomicAdd(&tempBuffer[f1.x * 3 + 1].value, i32(separationVector.y * 100.0));
+            atomicAdd(&tempBuffer[f1.x * 3 + 2].value, i32(separationVector.z * 100.0));
             atomicAdd(&tempCountBuffer[f1.x].value,i32(1));        
         }
         else if(closestVertex.x==tri1_vtx[1].x && closestVertex.y==tri1_vtx[1].y && closestVertex.z==tri1_vtx[1].z)
         {
-            atomicAdd(&tempBuffer[f1.y * 3 + 0].value, i32(collisionPoint.x * 100.0));
-            atomicAdd(&tempBuffer[f1.y * 3 + 1].value, i32(collisionPoint.y * 100.0));
-            atomicAdd(&tempBuffer[f1.y * 3 + 2].value, i32(collisionPoint.z * 100.0));
+            atomicAdd(&tempBuffer[f1.y * 3 + 0].value, i32(separationVector.x * 100.0));
+            atomicAdd(&tempBuffer[f1.y * 3 + 1].value, i32(separationVector.y * 100.0));
+            atomicAdd(&tempBuffer[f1.y * 3 + 2].value, i32(separationVector.z * 100.0));
             atomicAdd(&tempCountBuffer[f1.y].value,i32(1));
         }
         else if(closestVertex.x==tri1_vtx[2].x && closestVertex.y==tri1_vtx[2].y && closestVertex.z==tri1_vtx[2].z)
         {            
-            atomicAdd(&tempBuffer[f1.z * 3 + 0].value, i32(collisionPoint.x * 100.0));
-            atomicAdd(&tempBuffer[f1.z * 3 + 1].value, i32(collisionPoint.y * 100.0));
-            atomicAdd(&tempBuffer[f1.z * 3 + 2].value, i32(collisionPoint.z * 100.0));
+            atomicAdd(&tempBuffer[f1.z * 3 + 0].value, i32(separationVector.x * 100.0));
+            atomicAdd(&tempBuffer[f1.z * 3 + 1].value, i32(separationVector.y * 100.0));
+            atomicAdd(&tempBuffer[f1.z * 3 + 2].value, i32(separationVector.z * 100.0));
             atomicAdd(&tempCountBuffer[f1.z].value,i32(1));
         }
         

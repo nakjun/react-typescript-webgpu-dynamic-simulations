@@ -217,7 +217,7 @@ export class ClothRenderer extends RendererOrigin {
         return texture;
     }
     async createAssets() {
-        const assets1 = await this.createTextureFromImage("./textures/vivid_purple.png", this.device);
+        const assets1 = await this.createTextureFromImage("./textures/white.png", this.device);
         this.texture = assets1.texture;
         this.sampler = assets1.sampler;
         this.view = assets1.view;
@@ -789,10 +789,10 @@ export class ClothRenderer extends RendererOrigin {
         // N * M 그리드의 노드를 생성하는 로직
         //20x20 cloth
         const start_x = 30;
-        const start_y = 25;
+        const start_y = 30;
 
-        //const start_x = 15;
-        //const start_y = 10;
+        // const start_x = 15;
+        // const start_y = 10;
 
         // const dist_x = (this.xSize / this.N);
         // const dist_y = (this.ySize / this.M);
@@ -800,7 +800,7 @@ export class ClothRenderer extends RendererOrigin {
         // for (let i = 0; i < this.N; i++) {
         //     for (let j = 0; j < this.M; j++) {
         //         //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), -10.0);
-        //         var pos = vec3.fromValues(start_x - (dist_x * j), 25.0, start_y - (dist_y * i));
+        //         var pos = vec3.fromValues(start_x - (dist_x * j), 20.0, start_y - (dist_y * i));
         //         var vel = vec3.fromValues(0, 0, 0);
 
         //         const n = new Node(pos, vel);
@@ -841,8 +841,7 @@ export class ClothRenderer extends RendererOrigin {
                 this.particles.push(n);
             }
         }
-
-
+        
         const combinedVertices: number[] = [];
         this.particles.forEach((particle, index) => {
             combinedVertices.push(...particle.position, ...this.uvIndices[index]);
@@ -1937,6 +1936,7 @@ export class ClothRenderer extends RendererOrigin {
             },
             primitive: {
                 topology: 'triangle-list',
+                cullMode: 'none',
                 //topology: 'line-list',
             },
             depthStencil: {
@@ -2073,7 +2073,12 @@ export class ClothRenderer extends RendererOrigin {
             passEncoder.drawIndexed(this.triangleIndices.length);
         }
 
-
+        // if(this.renderOptions.wind){
+        //     passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
+        //     passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer                
+        //     passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
+        //     passEncoder.draw(this.N * this.M); // Draw the cube using the index count
+        // }
 
         passEncoder.end();
     }

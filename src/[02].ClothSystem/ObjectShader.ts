@@ -13,7 +13,7 @@ export class ObjectShader {
         let index: u32 = global_id.x;        
         var pos = getPosition(index);        
         
-        pos.x -= 0.005;
+        pos.x -= 0.007;
 
         positions[index*3 + 0] = pos.x;
         positions[index*3 + 1] = pos.y;

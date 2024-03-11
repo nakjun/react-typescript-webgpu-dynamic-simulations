@@ -28,10 +28,10 @@ export class ParticleShader {
         @fragment
         fn fs_main(in: FragmentOutput) -> @location(0) vec4<f32> {
             let lightDir = normalize(vec3<f32>(0.0, 20.0, -1.0));
-            let ambient = 0.1;
+            let ambient = 1.0;
             let lighting = ambient + (1.0 - ambient); 
             let color = vec3<f32>(in.Color.xyz);
-            return vec4<f32>(color * lighting, 1.0);        
+            return vec4<f32>(color * lighting, 1.0);
         }
     `;
 
@@ -147,13 +147,14 @@ export class ParticleShader {
         let lightIntensity: f32 = lightUBO.intensity;
         
         // 주변광 계산
-        let ambientColor: vec4<f32> = vec4<f32>(0.513725, 0.435294, 1.0, 1.0) * 0.001;
+        //let ambientColor: vec4<f32> = vec4<f32>(0.513725, 0.435294, 1.0, 1.0) * 0.001;
+        let ambientColor: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0) * 0.001;
     
         // // diffuse 계산
         let norm: vec3<f32> = normalize(Normal);
         let lightDir: vec3<f32> = normalize(lightPos - FragPos);
         let diff: f32 = max(dot(norm, lightDir), 0.0);
-        let diffuse: vec4<f32> = lightColor * diff * lightIntensity * vec4<f32>(0.513725, 0.435294, 1.0, 1.0);
+        let diffuse: vec4<f32> = lightColor * diff * lightIntensity * vec4<f32>(1.0, 1.0, 1.0, 1.0);
     
         // // specular 계산
         let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
@@ -211,22 +212,28 @@ export class ParticleShader {
         prevPosition[index*3 + 2] = pos.z;
         
         //floor collisions
-        if(pos.y < -0.0){
+        if(pos.y < 0.0){
             pos.y += 0.0001;  
-            vel *= -0.001;      
+            vel *= -0.0;      
         }
         
-        var gravity: vec3<f32> = vec3<f32>(0.0, -19.6, 0.0);
-        
-        var deltaTime: f32 = 0.0005; // Assuming 60 FPS for simplicity
-
-        vel += ((f + gravity + externalForce) * deltaTime);
+        var gravity: vec3<f32> = vec3<f32>(0.0, -32.6, 0.0);        
+        var deltaTime: f32 = 0.001; // Assuming 60 FPS for simplicity
+        vel += ((f + gravity) * deltaTime);
         pos += (vel * deltaTime);
         
-        if(externalForce.z!=0.0){
-            pos.z += 0.0001;
-            pos.y += 0.0001;  
+        if(externalForce.z!=0.0){                                    
+            if(index<600 && pos.z < 120.0){
+                pos.z += 0.1;
+                vel.y = -32.6;
+                vel.z = 20.0;
+            }            
+            else{
+                //pos.y += 0.01;
+            }
+            vel.z = 10.0;
         }
+
 
         velocities[index*3 + 0] = vel.x;
         velocities[index*3 + 1] = vel.y;
