@@ -3,13 +3,14 @@
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 ## Videos
-![videos](./videos/comparison.gif)
+[![videos](https://img.youtube.com/vi/V2d5ykCYyx0/0.jpg)](https://www.youtube.com/watch?v=V2d5ykCYyx0)
 
 ## Features
-- Dynamic Simulation Framework with React, Typescript, WebGPU
-- Just 3D View(Cube)
-- Particle Simulation System(Freefall)
-- Cloth Simulation System(Mass Spring)
+- Cloth Pulling Simulations in WebGPU
+- target object(dragon)   : 13,129 vertices, 26,258 triangles
+- cloth object　　　　　: 14,400 vertices, 85,082 springs, 28,322 triangles
+- method　　　　　　   : Mass-Spring System(without self-collision)
+
 
 ## Available Scripts
 
