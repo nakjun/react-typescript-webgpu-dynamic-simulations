@@ -3,7 +3,7 @@
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 ## Videos
-![videos](./videos/comparison.gif)
+![videos](./videos/hanging_gif.gif)
 
 ## Features
 - Dynamic Simulation Framework with React, Typescript, WebGPU
