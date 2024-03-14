@@ -79,14 +79,7 @@ const startClothSimluation = async () => {
       // 카메라 줌 인/아웃 로직 구현
       sceneManager.zoomCamera(event.deltaY / 100);
     });
-    //sceneManager.createClothModel(2, 2, 200.0, 150.0, 1000.0, 0.5);  
-    //sceneManager.createClothModel(64, 64, 595500.0, 595000.0, 505000.0, 1.0);
-    sceneManager.createClothModel(64, 64, 495500.0, 495000.0, 505000.0, 50.0);
-    //sceneManager.createClothModel(120, 120, 55000.0, 55000.0, 55000.0, 1000);
-    //sceneManager.createClothModel(200, 200, 20000.0, 3500.0, 65000.0, 0.1);    
-    //sceneManager.createClothModel(400, 400, 15000.0, 5000.0, 95000.0, 0.001);
-    //sceneManager.createClothModel(750, 750, 7000.0, 5000.0, 20000.0, 0.03);
-    //sceneManager.createClothModel(850, 850, 15000.0, 9500.0, 70000.0, 0.001);
+    sceneManager.createClothModel(64, 64, 350000.0, 350000.0, 350000.0, 100.0);
     sceneManager.createClothBuffers();
     sceneManager.createRenderPipeline();
     sceneManager.createSpringPipeline();

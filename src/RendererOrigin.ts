@@ -23,8 +23,8 @@ export class RendererOrigin {
     //lighting
     light_position: vec3 = vec3.fromValues(-50.0, 500.0, -100.0);
     light_color: vec3 = vec3.fromValues(1,1,1);
-    light_intensity: number = 1.0;
-    specular_strength: number = 0.8;
+    light_intensity: number = 0.1;
+    specular_strength: number = 0.7;
     shininess: number = 1.0;
 
     //fps
