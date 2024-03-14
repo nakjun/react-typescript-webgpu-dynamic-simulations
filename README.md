@@ -7,8 +7,6 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 ## Features
 - Dynamic Simulation Framework with React, Typescript, WebGPU
-- Just 3D View(Cube)
-- Particle Simulation System(Freefall)
 - Cloth Simulation System(Mass Spring)
 
 ## Available Scripts
