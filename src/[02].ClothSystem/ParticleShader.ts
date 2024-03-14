@@ -110,64 +110,87 @@ export class ParticleShader {
     }
     
     @fragment
-    fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {            
-        // let ambientStrength: f32 = 0.001; // 환경광 강도를 적절히 조절
-        // let ambientColor: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0) * ambientStrength; // 환경광 색상을 자연스러운 톤으로 조정
-        // var lightPos: vec3<f32> = lightUBO.position;
-        // let lightColor: vec4<f32> = lightUBO.color;
-        // let lightIntensity: f32 = lightUBO.intensity;
-
-        // let texColor: vec4<f32> = textureSample(myTexture, mySampler, TexCoord);            
-        // let norm: vec3<f32> = normalize(Normal);
+    fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {                   
+        
+        // let norm: vec3<f32> = Normal;        
         // let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
-        // var finalColor:vec4<f32> = ambientColor;
-
-        // for(var i=0;i<2;i=i+1){
-        //     if(i==1){
-        //         lightPos = vec3<f32>(0.0, 1.0, 0.0);
-        //     }
-            
-        //     let lightDir: vec3<f32> = normalize(lightPos - FragPos);
-        //     let diff: f32 = max(dot(norm, lightDir), 0.0);
-        //     let diffuse: vec4<f32> = lightColor * texColor * diff * lightIntensity; // 난반사 강도를 조정하여 디테일 강화
-            
-            
-        //     let reflectDir: vec3<f32> = reflect(-lightDir, norm);
-        //     let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), lightUBO.shininess);
-        //     let specular: vec4<f32> = lightColor * spec * lightUBO.specularStrength;
-            
-        //     finalColor = finalColor + diffuse + specular;
-        // }
         
-        // finalColor.a = 0.8; // 텍스처의 알파 값을 최종 색상의 알파 값으로 설정
-        // return finalColor;
+        // // 방향성 광원 1의 방향
+        // var direction1: vec3<f32> = vec3<f32>(-0.0, 0.0, -1.0);
+        // var lightDir1: vec3<f32> = direction1;
 
-        let lightPos: vec3<f32> = lightUBO.position;
-        let lightColor: vec4<f32> = lightUBO.color;
-        let lightIntensity: f32 = lightUBO.intensity;
-        
-        // 주변광 계산
-        //let ambientColor: vec4<f32> = vec4<f32>(0.513725, 0.435294, 1.0, 1.0) * 0.001;
-        let ambientColor: vec4<f32> = vec4<f32>(1.0, 1.0, 1.0, 1.0) * 0.001;
-    
-        // // diffuse 계산
-        let norm: vec3<f32> = normalize(Normal);
-        let lightDir: vec3<f32> = normalize(lightPos - FragPos);
-        let diff: f32 = max(dot(norm, lightDir), 0.0);
-        let diffuse: vec4<f32> = lightColor * diff * lightIntensity * vec4<f32>(1.0, 1.0, 1.0, 1.0);
-    
-        // // specular 계산
-        let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
-        let reflectDir: vec3<f32> = reflect(-lightDir, norm);
-        let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), lightUBO.shininess);
-        let specular: vec4<f32> = lightColor * spec * vec4<f32>(0.429134, 0.429134, 0.429134, 1.0);
+        // // 방향성 광원 2의 방향
+        // var direction2: vec3<f32> = vec3<f32>(0.0, 0.0, 1.0);
+        // var lightDir2: vec3<f32> = direction2;
+
+        // // 방향성 광원 3의 방향
+        // var direction3: vec3<f32> = vec3<f32>(-0.75, 0.0, 1.0);
+        // var lightDir3: vec3<f32> = direction3;
+
+        // // 방향성 광원 4의 방향
+        // var direction4: vec3<f32> = vec3<f32>(0.75, 0.0, -1.0);
+        // var lightDir4: vec3<f32> = direction4;
+
+        // // 두 방향성 광원에 대한 조명 계산 수행
+        // let diff1: f32 = max(dot(norm, lightDir1), 0.0);
+        // let diffuse1: vec4<f32> = lightUBO.color * lightUBO.intensity * diff1;
+        // let spec1: f32 = pow(max(dot(viewDir, reflect(-lightDir1, norm)), 0.0), lightUBO.shininess);
+        // let specular1: vec4<f32> = lightUBO.color * spec1 * lightUBO.specularStrength;
+
+        // let diff2: f32 = max(dot(norm, lightDir2), 0.0);
+        // let diffuse2: vec4<f32> = lightUBO.color * lightUBO.intensity * diff2;
+        // let spec2: f32 = pow(max(dot(viewDir, reflect(-lightDir2, norm)), 0.0), lightUBO.shininess);
+        // let specular2: vec4<f32> = lightUBO.color * spec2 * lightUBO.specularStrength;
+
+        // let diff3: f32 = max(dot(norm, lightDir3), 0.0);
+        // let diffuse3: vec4<f32> = lightUBO.color * lightUBO.intensity * diff3;
+        // let spec3: f32 = pow(max(dot(viewDir, reflect(-lightDir3, norm)), 0.0), lightUBO.shininess);
+        // let specular3: vec4<f32> = lightUBO.color * spec3 * lightUBO.specularStrength;
+
+        // let diff4: f32 = max(dot(norm, lightDir4), 0.0);
+        // let diffuse4: vec4<f32> = lightUBO.color * lightUBO.intensity * diff4;
+        // let spec4: f32 = pow(max(dot(viewDir, reflect(-lightDir4, norm)), 0.0), lightUBO.shininess);
+        // let specular4: vec4<f32> = lightUBO.color * spec4 * lightUBO.specularStrength;
+
+        // // 두 방향성 광원의 조명 효과를 합산
+        // var totalDiffuse: vec4<f32> = diffuse1 + diffuse2 + diffuse3 + diffuse4;
+        // var totalSpecular: vec4<f32> = specular1 + specular2 + specular3 + specular4;
 
         // // 최종 색상 계산
-        var finalColor: vec4<f32> = ambientColor + diffuse + specular;
+        // var finalColor: vec4<f32> = totalDiffuse + totalSpecular;
+        // return vec4<f32>(finalColor.rgb, 1.0); // Alpha는 1.0으로 고정
 
-        return vec4<f32>(finalColor.x,finalColor.y, finalColor.z, 1.0);
-        
-        //return vec4<f32>(diffuse.x, diffuse.y, diffuse.z, 1.0);
+        let norm: vec3<f32> = Normal;        
+        let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
+        var totalDiffuse: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        var totalSpecular: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+
+        // 방향성 광원들의 방향
+        var directions: array<vec3<f32>, 4> = array<vec3<f32>, 4>(
+            vec3<f32>(-0.0, 0.0, -1.0),
+            vec3<f32>(0.0, 0.0, 1.0),
+            vec3<f32>(-0.75, 0.0, 1.0),
+            vec3<f32>(0.75, 0.0, -1.0)
+        );
+
+        // 각 방향성 광원에 대한 조명 계산 수행
+        for (var i = 0; i < 4; i++) {
+            let lightDir: vec3<f32> = normalize(-directions[i]);
+            let diff: f32 = max(dot(norm, lightDir), 0.0);
+            let diffuse: vec4<f32> = lightUBO.color * lightUBO.intensity * diff;
+            let spec: f32 = pow(max(dot(viewDir, reflect(-lightDir, norm)), 0.0), lightUBO.shininess);
+            let specular: vec4<f32> = lightUBO.color * spec * lightUBO.specularStrength;
+
+            totalDiffuse += diffuse;
+            totalSpecular += specular;
+        }
+
+        // 텍스처 색상 샘플링
+        let textureColor: vec4<f32> = textureSample(myTexture, mySampler, TexCoord);
+
+        // 최종 색상 계산 (텍스처 색상과 조명 효과의 조합)
+        var finalColor: vec4<f32> = (totalDiffuse + totalSpecular) * textureColor;
+        return vec4<f32>(finalColor.rgb, alpha); // Alpha는 지정된 alpha 값으로 설정
     }
 
     `;
@@ -205,36 +228,17 @@ export class ParticleShader {
         
         var pos = getPosition(index);
         var vel = getVelocity(index);
-        var f = getForce(index) * 0.1;     
+        var f = getForce(index) * 0.05;     
         
         prevPosition[index*3 + 0] = pos.x;
         prevPosition[index*3 + 1] = pos.y;
         prevPosition[index*3 + 2] = pos.z;
         
-        //floor collisions
-        if(pos.y < 0.0){
-            pos.y += 0.0001;  
-            vel *= -0.0;      
-        }
-        
-        var gravity: vec3<f32> = vec3<f32>(0.0, -32.6, 0.0);        
-        var deltaTime: f32 = 0.001; // Assuming 60 FPS for simplicity
+        var gravity: vec3<f32> = vec3<f32>(0.0, -0.0, 15.0);        
+        var deltaTime: f32 = 0.005; // Assuming 60 FPS for simplicity
         vel += ((f + gravity) * deltaTime);
         pos += (vel * deltaTime);
         
-        if(externalForce.z!=0.0){                                    
-            if(index<600 && pos.z < 120.0){
-                pos.z += 0.1;
-                vel.y = -32.6;
-                vel.z = 20.0;
-            }            
-            else{
-                //pos.y += 0.01;
-            }
-            vel.z = 10.0;
-        }
-
-
         velocities[index*3 + 0] = vel.x;
         velocities[index*3 + 1] = vel.y;
         velocities[index*3 + 2] = vel.z;

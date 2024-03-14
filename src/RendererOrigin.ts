@@ -16,16 +16,16 @@ export class RendererOrigin {
 
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(96, 46, -57);
-    camera_target: vec3 = vec3.fromValues(-0.13, 8.48, -1.76);
+    camera_position: vec3 = vec3.fromValues(-16, 31, 85);
+    camera_target: vec3 = vec3.fromValues(70, -17.3, -16.5);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
     //lighting
-    light_position: vec3 = vec3.fromValues(150.0, 500.0, 150.0);
-    light_color: vec3 = vec3.fromValues(0.0, 1.0, 1.0);
+    light_position: vec3 = vec3.fromValues(-50.0, 500.0, -100.0);
+    light_color: vec3 = vec3.fromValues(1,1,1);
     light_intensity: number = 1.0;
-    specular_strength: number = 1.5;
-    shininess: number = 1024.0;
+    specular_strength: number = 0.8;
+    shininess: number = 1.0;
 
     //fps
     frameCount: number = 0;
@@ -105,13 +105,13 @@ export class RendererOrigin {
         this.camPosZControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosZ', -500, 500).name('Camera Position Z').onChange((value: number) => {
             this.camera.position[2] = value;
         });
-        this.lightPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightPosX', -500, 500).name('Light Position X').onChange((value: number) => {
+        this.lightPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightPosX', -1500, 1500).name('Light Position X').onChange((value: number) => {
             this.light_position[0] = value;
         });
-        this.lightPosYControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightPosY', -500, 500).name('Light Position Y').onChange((value: number) => {
+        this.lightPosYControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightPosY', -1500, 1500).name('Light Position Y').onChange((value: number) => {
             this.light_position[1] = value;
         });
-        this.lightPosZControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightPosZ', -500, 500).name('Light Position Z').onChange((value: number) => {
+        this.lightPosZControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightPosZ', -1500, 1500).name('Light Position Z').onChange((value: number) => {
             this.light_position[2] = value;
         });
         this.lightColorXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightColorX', 0.0, 1.0).step(0.01).name('Light Color X').onChange((value: number) => {

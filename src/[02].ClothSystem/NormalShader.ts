@@ -104,17 +104,6 @@ export class NormalShader{
 
             n = normalize(n);
 
-            // if(n.x<0.0){
-            //     n.x *= -1.0;
-            // }
-            // if(n.y<0.0){
-            //     n.y *= -1.0;
-            // }
-            // if(n.z<0.0){
-            //     n.z *= -1.0;
-            // }
-
-
             normal[id*3 + 0] = f32(n.x);
             normal[id*3 + 1] = f32(n.y);
             normal[id*3 + 2] = f32(n.z);

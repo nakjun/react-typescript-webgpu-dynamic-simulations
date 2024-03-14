@@ -7,7 +7,7 @@ const startParticleSimulation = async () => {
   sceneManager.init().then(() => {
     sceneManager.createBuffers();
     sceneManager.createPipeline();
-    sceneManager.createParticles(100000);
+    sceneManager.createParticles(200000);
     sceneManager.createParticleBuffers();
     sceneManager.createParticlePipeline();
     sceneManager.createComputePipeline();
@@ -80,9 +80,10 @@ const startClothSimluation = async () => {
       sceneManager.zoomCamera(event.deltaY / 100);
     });
     //sceneManager.createClothModel(2, 2, 200.0, 150.0, 1000.0, 0.5);  
-    //sceneManager.createClothModel(3, 3, 500.0, 250.0, 1500.0, 0.3);
-    sceneManager.createClothModel(120, 120, 555000.0, 545000.0, 550000.0, 1000);
-    //sceneManager.createClothModel(200, 200, 10000.0, 3500.0, 65000.0, 0.1);    
+    //sceneManager.createClothModel(64, 64, 595500.0, 595000.0, 505000.0, 1.0);
+    sceneManager.createClothModel(64, 64, 495500.0, 495000.0, 505000.0, 50.0);
+    //sceneManager.createClothModel(120, 120, 55000.0, 55000.0, 55000.0, 1000);
+    //sceneManager.createClothModel(200, 200, 20000.0, 3500.0, 65000.0, 0.1);    
     //sceneManager.createClothModel(400, 400, 15000.0, 5000.0, 95000.0, 0.001);
     //sceneManager.createClothModel(750, 750, 7000.0, 5000.0, 20000.0, 0.03);
     //sceneManager.createClothModel(850, 850, 15000.0, 9500.0, 70000.0, 0.001);
@@ -94,8 +95,6 @@ const startClothSimluation = async () => {
     sceneManager.createUpdateNormalPipeline();
     sceneManager.createSpringForceComputePipeline();
     sceneManager.createNodeForceSummationPipeline();
-    sceneManager.createIntersectionPipeline();
-    sceneManager.createTriTriIntersectionPipeline();
 
     animate();
   });
