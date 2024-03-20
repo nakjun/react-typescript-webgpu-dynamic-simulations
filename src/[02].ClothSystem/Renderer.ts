@@ -165,7 +165,8 @@ export class ClothRenderer extends RendererOrigin {
     async init() {
         await super.init();
         await this.createAssets();
-        await this.MakeModelData();
+        //await this.MakeModelData();
+        await this.createSphereModel();
     }
     async createTextureFromImage(src: string, device: GPUDevice): Promise<{ texture: GPUTexture, sampler: GPUSampler, view: GPUTextureView }> {
         const response: Response = await fetch(src);
@@ -290,7 +291,7 @@ export class ClothRenderer extends RendererOrigin {
         this.InitNodeForce(commandEncoder);
         this.updateSprings(commandEncoder);
         this.summationNodeForce(commandEncoder);
-        this.Intersections(commandEncoder);
+        //this.Intersections(commandEncoder);
 
 
         this.updateParticles(commandEncoder);
@@ -310,9 +311,9 @@ export class ClothRenderer extends RendererOrigin {
 
     /* Create Data */
     createSphereModel() {
-        this.sphereRadious = 10.0;
+        this.sphereRadious = 1.0;
         this.sphereSegments = 64;
-        this.spherePosition = vec3.fromValues(0.0, 0.0, 0.0);
+        this.spherePosition = vec3.fromValues(30.0, 30.0, -10.0);
         var sphere = this.modelGenerator.createSphere(this.sphereRadious, this.sphereSegments, this.spherePosition);
         var vertArray = new Float32Array(sphere.vertices);
         var indArray = new Uint32Array(sphere.indices);
@@ -325,6 +326,191 @@ export class ClothRenderer extends RendererOrigin {
         this.objectIndexBuffer = makeUInt32IndexArrayBuffer(this.device, indArray);
         this.objectUVBuffer = makeFloat32ArrayBufferStorage(this.device, uvArray);
         this.objectNormalBuffer = makeFloat32ArrayBufferStorage(this.device, normalArray);
+
+        this.objectIndicesLength = sphere.indices.length;
+
+        console.log("this object's indices length: " + this.objectIndicesLength / 3);
+
+        this.ObjectPosBuffer = makeFloat32ArrayBufferStorage(this.device, vertArray);
+        this.objectIndexBuffer = makeUInt32IndexArrayBuffer(this.device, indArray);
+        this.objectUVBuffer = makeFloat32ArrayBufferStorage(this.device, uvArray);
+        this.objectNormalBuffer = makeFloat32ArrayBufferStorage(this.device, normalArray);
+
+        const numTriangleData = new Uint32Array([sphere.indices.length / 3]);
+        this.objectNumTriangleBuffer = this.device.createBuffer({
+            size: numTriangleData.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            mappedAtCreation: true,
+        });
+        new Uint32Array(this.objectNumTriangleBuffer.getMappedRange()).set(numTriangleData);
+        this.objectNumTriangleBuffer.unmap();
+
+        const shaderModule = this.device.createShaderModule({ code: this.objectShader.getMoveShader() });
+        const bindGroupLayout = this.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0, // The binding number in the shader
+                    visibility: GPUShaderStage.COMPUTE, // Accessible from the vertex shader
+                    buffer: { type: 'storage', minBindingSize: 0, },
+                },
+            ]
+        });
+
+        const computePipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+        this.computeObjectMovePipeline = this.device.createComputePipeline({
+            layout: computePipelineLayout,
+            compute: {
+                module: shaderModule,
+                entryPoint: 'main',
+            },
+        });
+        this.computeObjectMoveBindGroup = this.device.createBindGroup({
+            layout: bindGroupLayout, // The layout created earlier
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: this.ObjectPosBuffer }
+                },
+            ]
+        });
+
+
+
+        const materialShaderModule = this.device.createShaderModule({ code: this.objectShader.getMaterialShader() });
+        const bindGroupLayout2 = this.device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.VERTEX,
+                    buffer: {}
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'uniform',
+                    }
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    buffer: {
+                        type: 'uniform',
+                    }
+                },
+            ]
+        });
+
+        this.camPosBuffer = this.device.createBuffer({
+            size: 4 * Float32Array.BYTES_PER_ELEMENT, // vec3<f32> + padding
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
+        this.lightDataBuffer = this.device.createBuffer({
+            size: 48, // vec3 position (12 bytes) + padding (4 bytes) + vec4 color (16 bytes) + intensity (4 bytes)
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
+        this.mvpUniformBuffer = this.device.createBuffer({
+            size: 64 * 3, // The total size needed for the matrices
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST // The buffer is used as a uniform and can be copied to
+        });
+
+        this.objRenderBindGroup = this.device.createBindGroup({
+            layout: bindGroupLayout2,
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: this.mvpUniformBuffer
+                    }
+                },
+                {
+                    binding: 1,
+                    resource: {
+                        buffer: this.camPosBuffer
+                    }
+                },
+                {
+                    binding: 2,
+                    resource: {
+                        buffer: this.lightDataBuffer
+                    }
+                }
+            ]
+        });
+
+        const pipelineLayout = this.device.createPipelineLayout({
+            bindGroupLayouts: [bindGroupLayout2],
+        });
+
+        this.objRenderPipeline = this.device.createRenderPipeline({
+            layout: pipelineLayout,
+            vertex: {
+                module: materialShaderModule,
+                entryPoint: 'vs_main',
+                buffers: [{
+                    arrayStride: 12,
+                    attributes: [
+                        {
+                            shaderLocation: 0,
+                            format: "float32x3",
+                            offset: 0
+                        }
+                    ]
+                },
+                {
+                    arrayStride: 8,
+                    attributes: [
+                        {
+                            shaderLocation: 1,
+                            format: "float32x2",
+                            offset: 0
+                        }
+                    ]
+                },
+                {
+                    arrayStride: 12,
+                    attributes: [
+                        {
+                            shaderLocation: 2,
+                            format: "float32x3",
+                            offset: 0
+                        }
+                    ]
+                }
+                ],
+            },
+            fragment: {
+                module: materialShaderModule,
+                entryPoint: 'fs_main',
+                targets: [{
+                    format: this.format, blend: {
+                        color: {
+                            srcFactor: "src-alpha",
+                            dstFactor: "one-minus-src-alpha",
+                            operation: "add",
+                        },
+                        alpha: {
+                            srcFactor: "src-alpha",
+                            dstFactor: "one-minus-src-alpha",
+                            operation: "add",
+                        },
+                    },
+                }],
+            },
+            primitive: {
+                topology: 'triangle-list',
+            },
+            depthStencil: {
+                depthWriteEnabled: true,
+                depthCompare: 'less',
+                format: 'depth32float',
+            },
+            multisample: {
+                count: this.sampleCount,
+            },
+        });
     }
 
     async MakeModelData() {
@@ -794,42 +980,13 @@ export class ClothRenderer extends RendererOrigin {
         // const start_x = 15;
         // const start_y = 10;
 
-        // const dist_x = (this.xSize / this.N);
-        // const dist_y = (this.ySize / this.M);
-
-        // for (let i = 0; i < this.N; i++) {
-        //     for (let j = 0; j < this.M; j++) {
-        //         //var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), -10.0);
-        //         var pos = vec3.fromValues(start_x - (dist_x * j), 20.0, start_y - (dist_y * i));
-        //         var vel = vec3.fromValues(0, 0, 0);
-
-        //         const n = new Node(pos, vel);
-
-        //         let u = j / (this.M - 1);
-        //         let v = i / (this.N - 1);
-
-        //         this.uvIndices.push([u, v]);
-        //         this.particles.push(n);
-        //     }
-        // }
-
         const dist_x = (this.xSize / this.N);
         const dist_y = (this.ySize / this.M);
-        const maxHeight = 27.0; // 최대 높이 설정
-        const minHeight = 13.0; // 최소 높이 설정
-
-        // 중심점 위치 계산
-        const centerX = (this.N - 1) / 2;
-        const centerY = (this.M - 1) / 2;
 
         for (let i = 0; i < this.N; i++) {
             for (let j = 0; j < this.M; j++) {
-                // 중심으로부터의 거리에 따른 높이 조정
-                let distanceFromCenter = Math.sqrt(Math.pow(i - centerX, 2) + Math.pow(j - centerY, 2));
-                let heightFactor = (distanceFromCenter / Math.max(centerX, centerY)) * (maxHeight - minHeight);
-                let yPos = (maxHeight + heightFactor) - 7.0;
-
-                var pos = vec3.fromValues(start_x - (dist_x * j), yPos, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x + (dist_x * j), start_y - (dist_y * i), -10.0);
+                //var pos = vec3.fromValues(start_x - (dist_x * j), 100.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -841,6 +998,35 @@ export class ClothRenderer extends RendererOrigin {
                 this.particles.push(n);
             }
         }
+
+        // const dist_x = (this.xSize / this.N);
+        // const dist_y = (this.ySize / this.M);
+        // const maxHeight = 27.0; // 최대 높이 설정
+        // const minHeight = 13.0; // 최소 높이 설정
+
+        // // 중심점 위치 계산
+        // const centerX = (this.N - 1) / 2;
+        // const centerY = (this.M - 1) / 2;
+
+        // for (let i = 0; i < this.N; i++) {
+        //     for (let j = 0; j < this.M; j++) {
+        //         // 중심으로부터의 거리에 따른 높이 조정
+        //         let distanceFromCenter = Math.sqrt(Math.pow(i - centerX, 2) + Math.pow(j - centerY, 2));
+        //         let heightFactor = (distanceFromCenter / Math.max(centerX, centerY)) * (maxHeight - minHeight);
+        //         let yPos = (maxHeight + heightFactor) - 7.0;
+
+        //         var pos = vec3.fromValues(start_x - (dist_x * j), yPos, start_y - (dist_y * i));
+        //         var vel = vec3.fromValues(0, 0, 0);
+
+        //         const n = new Node(pos, vel);
+
+        //         let u = j / (this.M - 1);
+        //         let v = i / (this.N - 1);
+
+        //         this.uvIndices.push([u, v]);
+        //         this.particles.push(n);
+        //     }
+        // }
         
         const combinedVertices: number[] = [];
         this.particles.forEach((particle, index) => {
@@ -916,9 +1102,10 @@ export class ClothRenderer extends RendererOrigin {
         // for (let i = this.N / 2; i < this.N; i++) {
         //     this.particles[i].fixed = true;
         // }
+        
         //0, N fix       
-        // this.particles[0].fixed = true;
-        // this.particles[this.N-1].fixed = true;
+        this.particles[0].fixed = true;
+        this.particles[this.N-1].fixed = true;
 
         this.numParticles = this.particles.length;
         console.log("make #", this.numParticles, " particles create success");
