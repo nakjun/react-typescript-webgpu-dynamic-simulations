@@ -3,20 +3,10 @@ export class SpringShader {
     springUpdateShader = `
     @group(0) @binding(0) var<storage, read_write> positions: array<f32>;
     @group(0) @binding(1) var<storage, read_write> velocities: array<f32>;
-    @group(0) @binding(2) var<storage, read> springs: array<Spring>;
+    @group(0) @binding(2) var<storage, read> springs: array<f32>;
     @group(0) @binding(3) var<uniform> numSprings: u32;
     @group(0) @binding(4) var<storage, read_write> nodeForce: array<atomicI32>;
     @group(0) @binding(5) var<uniform> numParticles: u32;
-
-    struct Spring {
-        index1: f32,
-        index2: f32,
-        ks: f32,
-        kd: f32,
-        mRestLen: f32,
-        target1: f32,
-        target2: f32,
-    };
 
     struct atomicI32{
         value: atomic<i32>
@@ -37,10 +27,8 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
 
     if(id >= numSprings){return;}
 
-    var spring = springs[id];
-
-    var i1 = u32(spring.index1);
-    var i2 = u32(spring.index2);
+    var i1 = u32(springs[id * 5 + 0]);
+    var i2 = u32(springs[id * 5 + 1]);
 
     var pos1 = getPosition(i1);
     var pos2 = getPosition(i2);
@@ -48,27 +36,15 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     var vel1 = getVelocity(i1);
     var vel2 = getVelocity(i2);
 
-    var posDirection = pos2 - pos1;
-    var velDirection = vel2 - vel1;
+    if(length(pos2-pos1) < 0.00001){
+        return;
+    }
 
-    var len = length(posDirection);
-    var forceDirection = normalize(posDirection);
-    var spforce = (len - spring.mRestLen) * spring.ks;  
-    
-    var s1 = dot(vel1,forceDirection);
-    var s2 = dot(vel2,forceDirection);
+    var dir = normalize(pos2-pos1);
+    var springForce = springs[id * 5 + 2] * (length(pos2-pos1) - springs[id * 5 + 4]);
+    var dampingForce = springs[id * 5 + 3] * (dot(vel2, dir) - dot(vel1, dir));
 
-    var damp = dot(velDirection, forceDirection) / len * spring.kd;
-    //var damp = -spring.kd * (s1 + s2);
-    var estimatedForce = forceDirection * (spforce+damp) / len;              
-
-    // atomicAdd(&nodeForce[i1 * 3 + 0].value, i32(1));
-    // atomicAdd(&nodeForce[i1 * 3 + 1].value, i32(1));
-    // atomicAdd(&nodeForce[i1 * 3 + 2].value, i32(1));
-
-    // atomicAdd(&nodeForce[i2 * 3 + 0].value, i32(-1));
-    // atomicAdd(&nodeForce[i2 * 3 + 1].value, i32(-1));
-    // atomicAdd(&nodeForce[i2 * 3 + 2].value, i32(-1));
+    var estimatedForce = (springForce + dampingForce)*dir;
 
     atomicAdd(&nodeForce[i1 * 3 + 0].value, i32(estimatedForce.x*100.0));
     atomicAdd(&nodeForce[i1 * 3 + 1].value, i32(estimatedForce.y*100.0));

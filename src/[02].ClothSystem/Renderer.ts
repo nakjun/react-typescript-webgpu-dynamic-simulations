@@ -315,24 +315,26 @@ export class ClothRenderer extends RendererOrigin {
         this.sphereSegments = 64;
         this.spherePosition = vec3.fromValues(30.0, 30.0, -10.0);
         var sphere = this.modelGenerator.createSphere(this.sphereRadious, this.sphereSegments, this.spherePosition);
-        var vertArray = new Float32Array(sphere.vertices);
-        var indArray = new Uint32Array(sphere.indices);
+
+        var sphere2 = this.modelGenerator.createSphere(this.sphereRadious, this.sphereSegments, vec3.fromValues(99.453125, 30.0, -10.0));
+
+        var vertArray = new Float32Array([...sphere.vertices, ...sphere2.vertices]);
+        //var indArray = new Uint32Array(sphere.indices);
         var uvArray = new Float32Array(sphere.uvs);
         var normalArray = new Float32Array(sphere.normals);
         this.objectIndicesLength = sphere.indices.length;
 
+            // 인덱스 오프셋 적용
+        var vertexOffset = sphere.vertices.length / 3; // 각 정점은 3개의 값(x, y, z)으로 구성됨
+        var sphere2IndicesWithOffset = sphere2.indices.map(index => index + vertexOffset);
+        var combinedIndArray = new Uint32Array([...sphere.indices, ...sphere2IndicesWithOffset]);
 
-        this.ObjectPosBuffer = makeFloat32ArrayBufferStorage(this.device, vertArray);
-        this.objectIndexBuffer = makeUInt32IndexArrayBuffer(this.device, indArray);
-        this.objectUVBuffer = makeFloat32ArrayBufferStorage(this.device, uvArray);
-        this.objectNormalBuffer = makeFloat32ArrayBufferStorage(this.device, normalArray);
-
-        this.objectIndicesLength = sphere.indices.length;
+        this.objectIndicesLength = combinedIndArray.length;
 
         console.log("this object's indices length: " + this.objectIndicesLength / 3);
 
         this.ObjectPosBuffer = makeFloat32ArrayBufferStorage(this.device, vertArray);
-        this.objectIndexBuffer = makeUInt32IndexArrayBuffer(this.device, indArray);
+        this.objectIndexBuffer = makeUInt32IndexArrayBuffer(this.device, combinedIndArray);
         this.objectUVBuffer = makeFloat32ArrayBufferStorage(this.device, uvArray);
         this.objectNormalBuffer = makeFloat32ArrayBufferStorage(this.device, normalArray);
 
@@ -1093,9 +1095,14 @@ export class ClothRenderer extends RendererOrigin {
         this.triangleIndices = new Uint32Array(indices);
 
         //first line fix
-        // for (let i = 0; i < this.N; i++) {
+        // for (let i = 0; i < 5; i++) {
         //     this.particles[i].fixed = true;
         // }
+
+        // for (let i = this.N-6; i < this.N; i++) {
+        //     this.particles[i].fixed = true;
+        // }
+
         // for (let i = 0; i < this.N / 3; i++) {
         //     this.particles[i].fixed = true;
         // }
@@ -1106,9 +1113,11 @@ export class ClothRenderer extends RendererOrigin {
         //0, N fix       
         this.particles[0].fixed = true;
         this.particles[this.N-1].fixed = true;
+        //console.log(this.particles[this.N-1].position)
 
         this.numParticles = this.particles.length;
         console.log("make #", this.numParticles, " particles create success");
+        console.log("make #", indices.length, " faces create success");
         for (let i = 0; i < this.particles.length; i++) {
             let nConnectedTriangle = this.particles[i].triangles.length;
             this.maxTriangleConnected = Math.max(this.maxTriangleConnected, nConnectedTriangle);
@@ -1307,16 +1316,14 @@ export class ClothRenderer extends RendererOrigin {
         new Uint32Array(this.triangleRenderBuffer.getMappedRange()).set(this.triangleIndices);
         this.triangleRenderBuffer.unmap();
 
-        const springCalcData = new Float32Array(this.springs.length * 7); // 7 elements per spring
+        const springCalcData = new Float32Array(this.springs.length * 5); // 7 elements per spring
         this.springs.forEach((spring, i) => {
-            let offset = i * 7;
+            let offset = i * 5;
             springCalcData[offset] = spring.index1;
             springCalcData[offset + 1] = spring.index2;
             springCalcData[offset + 2] = spring.kS;
             springCalcData[offset + 3] = spring.kD;
             springCalcData[offset + 4] = spring.mRestLen;
-            springCalcData[offset + 5] = spring.targetIndex1;
-            springCalcData[offset + 6] = spring.targetIndex2;
         });
         // Create the GPU buffer for springs
         this.springCalculationBuffer = this.device.createBuffer({

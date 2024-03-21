@@ -109,57 +109,8 @@ export class ParticleShader {
         return output;
     }
     
-    @fragment
-    fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {                   
-        
-        // let norm: vec3<f32> = Normal;        
-        // let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
-        
-        // // 방향성 광원 1의 방향
-        // var direction1: vec3<f32> = vec3<f32>(-0.0, 0.0, -1.0);
-        // var lightDir1: vec3<f32> = direction1;
-
-        // // 방향성 광원 2의 방향
-        // var direction2: vec3<f32> = vec3<f32>(0.0, 0.0, 1.0);
-        // var lightDir2: vec3<f32> = direction2;
-
-        // // 방향성 광원 3의 방향
-        // var direction3: vec3<f32> = vec3<f32>(-0.75, 0.0, 1.0);
-        // var lightDir3: vec3<f32> = direction3;
-
-        // // 방향성 광원 4의 방향
-        // var direction4: vec3<f32> = vec3<f32>(0.75, 0.0, -1.0);
-        // var lightDir4: vec3<f32> = direction4;
-
-        // // 두 방향성 광원에 대한 조명 계산 수행
-        // let diff1: f32 = max(dot(norm, lightDir1), 0.0);
-        // let diffuse1: vec4<f32> = lightUBO.color * lightUBO.intensity * diff1;
-        // let spec1: f32 = pow(max(dot(viewDir, reflect(-lightDir1, norm)), 0.0), lightUBO.shininess);
-        // let specular1: vec4<f32> = lightUBO.color * spec1 * lightUBO.specularStrength;
-
-        // let diff2: f32 = max(dot(norm, lightDir2), 0.0);
-        // let diffuse2: vec4<f32> = lightUBO.color * lightUBO.intensity * diff2;
-        // let spec2: f32 = pow(max(dot(viewDir, reflect(-lightDir2, norm)), 0.0), lightUBO.shininess);
-        // let specular2: vec4<f32> = lightUBO.color * spec2 * lightUBO.specularStrength;
-
-        // let diff3: f32 = max(dot(norm, lightDir3), 0.0);
-        // let diffuse3: vec4<f32> = lightUBO.color * lightUBO.intensity * diff3;
-        // let spec3: f32 = pow(max(dot(viewDir, reflect(-lightDir3, norm)), 0.0), lightUBO.shininess);
-        // let specular3: vec4<f32> = lightUBO.color * spec3 * lightUBO.specularStrength;
-
-        // let diff4: f32 = max(dot(norm, lightDir4), 0.0);
-        // let diffuse4: vec4<f32> = lightUBO.color * lightUBO.intensity * diff4;
-        // let spec4: f32 = pow(max(dot(viewDir, reflect(-lightDir4, norm)), 0.0), lightUBO.shininess);
-        // let specular4: vec4<f32> = lightUBO.color * spec4 * lightUBO.specularStrength;
-
-        // // 두 방향성 광원의 조명 효과를 합산
-        // var totalDiffuse: vec4<f32> = diffuse1 + diffuse2 + diffuse3 + diffuse4;
-        // var totalSpecular: vec4<f32> = specular1 + specular2 + specular3 + specular4;
-
-        // // 최종 색상 계산
-        // var finalColor: vec4<f32> = totalDiffuse + totalSpecular;
-        // return vec4<f32>(finalColor.rgb, 1.0); // Alpha는 1.0으로 고정
-
+    @fragment 
+    fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>, @builtin(front_facing) isFrontFacing : bool) -> @location(0) vec4<f32> {
         let norm: vec3<f32> = Normal;        
         let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
         var totalDiffuse: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0);
@@ -190,6 +141,11 @@ export class ParticleShader {
 
         // 최종 색상 계산 (텍스처 색상과 조명 효과의 조합)
         var finalColor: vec4<f32> = (totalDiffuse + totalSpecular) * textureColor;
+
+        // if (!isFrontFacing) {
+        //     finalColor = vec4<f32>(1.0, 1.0, 1.0, 1.0); // 흰색으로 설정
+        // }
+
         return vec4<f32>(finalColor.rgb, alpha); // Alpha는 지정된 alpha 값으로 설정
     }
 
@@ -234,9 +190,9 @@ export class ParticleShader {
         prevPosition[index*3 + 1] = pos.y;
         prevPosition[index*3 + 2] = pos.z;
         
-        var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);        
-        var deltaTime: f32 = 0.005; // Assuming 60 FPS for simplicity
-        vel += ((f + vec3<f32>(0.0, 0.0, 2.0) + gravity) * deltaTime);
+        var gravity: vec3<f32> = vec3<f32>(0.0, -4.9, 0.0);        
+        var deltaTime: f32 = 0.003; // Assuming 60 FPS for simplicity
+        vel += ((f + vec3<f32>(0.0, 0.0, 3.0) + gravity) * deltaTime);
         pos += (vel * deltaTime);
         
         velocities[index*3 + 0] = vel.x;
