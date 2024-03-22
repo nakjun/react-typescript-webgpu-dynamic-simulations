@@ -830,7 +830,7 @@ export class ClothRenderer extends RendererOrigin {
                 let heightFactor = (distanceFromCenter / Math.max(centerX, centerY)) * (maxHeight - minHeight);
                 let yPos = (maxHeight + heightFactor) - 7.0;
 
-                var pos = vec3.fromValues(start_x - (dist_x * j), 21.0, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x - (dist_x * j), 20.5, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -842,7 +842,7 @@ export class ClothRenderer extends RendererOrigin {
                 this.particles.push(n);
             }
         }
-        
+
         const combinedVertices: number[] = [];
         this.particles.forEach((particle, index) => {
             combinedVertices.push(...particle.position, ...this.uvIndices[index]);
@@ -2058,7 +2058,7 @@ export class ClothRenderer extends RendererOrigin {
         passEncoder.setVertexBuffer(2, this.vertexNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
         passEncoder.setIndexBuffer(this.triangleRenderBuffer, 'uint32'); // 인덱스 포맷 수정
         passEncoder.setBindGroup(0, this.triangleBindGroup); // Set the bind group with MVP matrix
-        passEncoder.drawIndexed(this.triangleIndices.length);        
+        passEncoder.drawIndexed(this.triangleIndices.length);
         if (this.renderOptions.wireFrame) {
             passEncoder.setPipeline(this.springPipeline);
             passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
@@ -2071,7 +2071,7 @@ export class ClothRenderer extends RendererOrigin {
             passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
             passEncoder.draw(this.N * this.M); // Draw the cube using the index count
         }
-        
+
         // if(this.renderOptions.wind){
         //     passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
         //     passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer                

@@ -205,58 +205,46 @@ export class ParticleShader {
         
         var pos = getPosition(index);
         var vel = getVelocity(index);
-        var f = getForce(index) * 0.1;     
+        var f = getForce(index);     
         
         prevPosition[index*3 + 0] = pos.x;
         prevPosition[index*3 + 1] = pos.y;
         prevPosition[index*3 + 2] = pos.z;
-
+        var flag:bool = false;
         if(externalForce.z!=0.0){                                    
             var origin_pos = getPosition(0);
-            var dist = distance(origin_pos,pos);
-            var attenuation = 1.0 / (dist * dist + 0.000001);
-            // if(pos.z < 120.0){
-            //     pos.z += (0.05 * attenuation);
-            //     pos.y += (0.05 * attenuation);
-            //     vel.y = 0.0;
-            //     //vel.z = 20.0;
-            // }            
-            // else{
-            //     //pos.y += 0.01;
-            // }
-            // vel.z = 10.0;            
-            if(index==0){
-                
-                if(pos.z <= 150.0) {pos.x += (0.2);pos.z += (0.25);}
-                if(pos.y <= 80.0) {pos.y += (0.2);}
-                
-                vel.x = 4.75;
-                vel.y = 4.75;
-                vel.z = 4.75;
-                if(pos.z > 150.0 && pos.y > 80.0){                    
-                    vel.x = 0.0;
-                    vel.y = 0.0;
-                    vel.z = 0.0;
-                }
+            var dist = distance(origin_pos, pos);
+            if(dist < 20.0)
+            {
+                vel *= 0.3;
+                f *= 0.0;
+                if(pos.y >= -20.0){
+                    pos.y -= 0.01;
+                }                
+                pos.z += 0.05;
+                flag = true;
             }
         }
 
-        var origin_location:vec3<f32> = vec3<f32>(0.0,0.0,0.0);
-
-        if(distance(pos, origin_location) < 20.0){
-            var dir = normalize(origin_location-pos);
-            pos += (-dir * 0.01);
-            vel *= -0.01;
-        }
-        
-        //floor collisions
-        if(pos.y < -15.0){
-            pos.y += 0.0001;  
-            vel *= -0.1;      
+        if(flag==false){
+            
+            var origin_location:vec3<f32> = vec3<f32>(0.0,0.0,0.0);
+    
+            if(distance(pos, origin_location) < 20.0){
+                var dir = normalize(origin_location-pos);
+                pos += (-dir*0.25);
+                vel *= 0.3;
+            }
+            
+            //floor collisions
+            if(pos.y < -20.0){
+                pos.y += 0.0001;  
+                vel *= -0.3;      
+            }
         }
         
         var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);        
-        var deltaTime: f32 = 0.002; // Assuming 60 FPS for simplicity
+        var deltaTime: f32 = 0.003; // Assuming 60 FPS for simplicity
         vel += ((f + gravity) * deltaTime);
         pos += (vel * deltaTime);
         

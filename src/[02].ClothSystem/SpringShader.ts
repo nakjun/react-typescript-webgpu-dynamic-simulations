@@ -58,8 +58,8 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     var s1 = dot(vel1,forceDirection);
     var s2 = dot(vel2,forceDirection);
 
-    var damp = dot(velDirection, forceDirection) / len * spring.kd;
-    //var damp = -spring.kd * (s1 + s2);
+    //var damp = dot(velDirection, forceDirection) / len * spring.kd;
+    var damp = spring.kd * (s2 - s1);
     var estimatedForce = forceDirection * (spforce+damp) / len;              
 
     // atomicAdd(&nodeForce[i1 * 3 + 0].value, i32(1));
@@ -135,7 +135,7 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     
     `;
 
-    getNodeForceShader(){
+    getNodeForceShader() {
         return this.nodeForceSummation;
     }
 }

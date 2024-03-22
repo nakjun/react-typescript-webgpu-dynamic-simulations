@@ -16,8 +16,8 @@ export class RendererOrigin {
 
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(120, 15, 20);
-    camera_target: vec3 = vec3.fromValues(-3, 21, 5.3);
+    camera_position: vec3 = vec3.fromValues(135, 35, -125);
+    camera_target: vec3 = vec3.fromValues(-3, 16, 3.6);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
     //lighting
