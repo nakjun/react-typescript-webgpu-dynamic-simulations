@@ -109,8 +109,8 @@ export class ClothRenderer extends RendererOrigin {
 
     kD: number = 0;
 
-    xSize: number = 70.0;
-    ySize: number = 70.0;
+    xSize: number = 100.0;
+    ySize: number = 100.0;
 
     //for temp storage buffer
     maxSpringConnected: number = 0;
@@ -290,7 +290,7 @@ export class ClothRenderer extends RendererOrigin {
         this.InitNodeForce(commandEncoder);
         this.updateSprings(commandEncoder);
         this.summationNodeForce(commandEncoder);
-        this.Intersections(commandEncoder);
+        //this.Intersections(commandEncoder);
 
 
         this.updateParticles(commandEncoder);
@@ -332,8 +332,8 @@ export class ClothRenderer extends RendererOrigin {
 
         //this.model = await loader.load('./objects/skybox.obj', 10.0);
         //this.model = await loader.load('./objects/bunny.obj', 100.0);
-        //this.model = await loader.load('./objects/armadillo4.obj', 30.0);
-        this.model = await loader.load('./objects/dragon2.obj', 2.0);
+        this.model = await loader.load('./objects/sphere.obj', 20.0);
+        //this.model = await loader.load('./objects/dragon2.obj', 2.0);
 
         console.log("object file load end");
 
@@ -343,6 +343,7 @@ export class ClothRenderer extends RendererOrigin {
         var uvArray = new Float32Array(this.model.uvs);
         this.objectIndicesLength = this.model.indices.length;
 
+        console.log("this object's vertices length: " + this.model.vertices.length / 3);
         console.log("this object's indices length: " + this.objectIndicesLength / 3);
 
         this.ObjectPosBuffer = makeFloat32ArrayBufferStorage(this.device, vertArray);
@@ -788,8 +789,8 @@ export class ClothRenderer extends RendererOrigin {
     createParticles() {
         // N * M 그리드의 노드를 생성하는 로직
         //20x20 cloth
-        const start_x = 30;
-        const start_y = 30;
+        const start_x = 45;
+        const start_y = 45;
 
         // const start_x = 15;
         // const start_y = 10;
@@ -829,7 +830,7 @@ export class ClothRenderer extends RendererOrigin {
                 let heightFactor = (distanceFromCenter / Math.max(centerX, centerY)) * (maxHeight - minHeight);
                 let yPos = (maxHeight + heightFactor) - 7.0;
 
-                var pos = vec3.fromValues(start_x - (dist_x * j), yPos, start_y - (dist_y * i));
+                var pos = vec3.fromValues(start_x - (dist_x * j), 21.0, start_y - (dist_y * i));
                 var vel = vec3.fromValues(0, 0, 0);
 
                 const n = new Node(pos, vel);
@@ -2051,6 +2052,13 @@ export class ClothRenderer extends RendererOrigin {
             passEncoder.drawIndexed(this.objectIndicesLength);
         }
 
+        passEncoder.setPipeline(this.trianglePipeline);
+        passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        passEncoder.setVertexBuffer(1, this.uvBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        passEncoder.setVertexBuffer(2, this.vertexNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
+        passEncoder.setIndexBuffer(this.triangleRenderBuffer, 'uint32'); // 인덱스 포맷 수정
+        passEncoder.setBindGroup(0, this.triangleBindGroup); // Set the bind group with MVP matrix
+        passEncoder.drawIndexed(this.triangleIndices.length);        
         if (this.renderOptions.wireFrame) {
             passEncoder.setPipeline(this.springPipeline);
             passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
@@ -2063,16 +2071,7 @@ export class ClothRenderer extends RendererOrigin {
             passEncoder.setBindGroup(0, this.renderBindGroup); // Set the bind group with MVP matrix
             passEncoder.draw(this.N * this.M); // Draw the cube using the index count
         }
-        else {
-            passEncoder.setPipeline(this.trianglePipeline);
-            passEncoder.setVertexBuffer(0, this.positionBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-            passEncoder.setVertexBuffer(1, this.uvBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-            passEncoder.setVertexBuffer(2, this.vertexNormalBuffer); // 정점 버퍼 설정, 스프링의 경우 필요에 따라
-            passEncoder.setIndexBuffer(this.triangleRenderBuffer, 'uint32'); // 인덱스 포맷 수정
-            passEncoder.setBindGroup(0, this.triangleBindGroup); // Set the bind group with MVP matrix
-            passEncoder.drawIndexed(this.triangleIndices.length);
-        }
-
+        
         // if(this.renderOptions.wind){
         //     passEncoder.setPipeline(this.particlePipeline); // Your render pipeline        
         //     passEncoder.setVertexBuffer(0, this.positionBuffer); // Set the vertex buffer                

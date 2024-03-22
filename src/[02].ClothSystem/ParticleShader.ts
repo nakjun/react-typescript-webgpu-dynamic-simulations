@@ -154,13 +154,13 @@ export class ParticleShader {
         let norm: vec3<f32> = normalize(Normal);
         let lightDir: vec3<f32> = normalize(lightPos - FragPos);
         let diff: f32 = max(dot(norm, lightDir), 0.0);
-        let diffuse: vec4<f32> = lightColor * diff * lightIntensity * vec4<f32>(1.0, 1.0, 1.0, 1.0);
+        let diffuse: vec4<f32> = lightColor * diff * lightIntensity * vec4<f32>(0.88, 0.88, 0.88, 1.0);
     
         // // specular 계산
         let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
         let reflectDir: vec3<f32> = reflect(-lightDir, norm);
         let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), lightUBO.shininess);
-        let specular: vec4<f32> = lightColor * spec * vec4<f32>(0.429134, 0.429134, 0.429134, 1.0);
+        let specular: vec4<f32> = lightColor * spec * vec4<f32>(0.729134, 0.729134, 0.729134, 1.0);
 
         // // 최종 색상 계산
         var finalColor: vec4<f32> = ambientColor + diffuse + specular;
@@ -197,9 +197,9 @@ export class ParticleShader {
     @workgroup_size(256)
     fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let index: u32 = global_id.x;
-        var fixed = fixed[index];
+        var fix = fixed[index];
         
-        if(fixed==1){
+        if(fix==1){
             return;
         }
         
@@ -210,31 +210,56 @@ export class ParticleShader {
         prevPosition[index*3 + 0] = pos.x;
         prevPosition[index*3 + 1] = pos.y;
         prevPosition[index*3 + 2] = pos.z;
-        
-        //floor collisions
-        if(pos.y < 0.0){
-            pos.y += 0.0001;  
-            vel *= -0.0;      
+
+        if(externalForce.z!=0.0){                                    
+            var origin_pos = getPosition(0);
+            var dist = distance(origin_pos,pos);
+            var attenuation = 1.0 / (dist * dist + 0.000001);
+            // if(pos.z < 120.0){
+            //     pos.z += (0.05 * attenuation);
+            //     pos.y += (0.05 * attenuation);
+            //     vel.y = 0.0;
+            //     //vel.z = 20.0;
+            // }            
+            // else{
+            //     //pos.y += 0.01;
+            // }
+            // vel.z = 10.0;            
+            if(index==0){
+                
+                if(pos.z <= 150.0) {pos.x += (0.2);pos.z += (0.25);}
+                if(pos.y <= 80.0) {pos.y += (0.2);}
+                
+                vel.x = 4.75;
+                vel.y = 4.75;
+                vel.z = 4.75;
+                if(pos.z > 150.0 && pos.y > 80.0){                    
+                    vel.x = 0.0;
+                    vel.y = 0.0;
+                    vel.z = 0.0;
+                }
+            }
+        }
+
+        var origin_location:vec3<f32> = vec3<f32>(0.0,0.0,0.0);
+
+        if(distance(pos, origin_location) < 20.0){
+            var dir = normalize(origin_location-pos);
+            pos += (-dir * 0.01);
+            vel *= -0.01;
         }
         
-        var gravity: vec3<f32> = vec3<f32>(0.0, -32.6, 0.0);        
-        var deltaTime: f32 = 0.001; // Assuming 60 FPS for simplicity
+        //floor collisions
+        if(pos.y < -15.0){
+            pos.y += 0.0001;  
+            vel *= -0.1;      
+        }
+        
+        var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);        
+        var deltaTime: f32 = 0.002; // Assuming 60 FPS for simplicity
         vel += ((f + gravity) * deltaTime);
         pos += (vel * deltaTime);
         
-        if(externalForce.z!=0.0){                                    
-            if(index<600 && pos.z < 120.0){
-                pos.z += 0.1;
-                vel.y = -32.6;
-                vel.z = 20.0;
-            }            
-            else{
-                //pos.y += 0.01;
-            }
-            vel.z = 10.0;
-        }
-
-
         velocities[index*3 + 0] = vel.x;
         velocities[index*3 + 1] = vel.y;
         velocities[index*3 + 2] = vel.z;

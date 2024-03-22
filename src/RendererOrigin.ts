@@ -16,14 +16,14 @@ export class RendererOrigin {
 
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(96, 46, -57);
-    camera_target: vec3 = vec3.fromValues(-0.13, 8.48, -1.76);
+    camera_position: vec3 = vec3.fromValues(120, 15, 20);
+    camera_target: vec3 = vec3.fromValues(-3, 21, 5.3);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
     //lighting
-    light_position: vec3 = vec3.fromValues(150.0, 500.0, 150.0);
-    light_color: vec3 = vec3.fromValues(0.0, 1.0, 1.0);
-    light_intensity: number = 1.0;
+    light_position: vec3 = vec3.fromValues(500.0, 500.0, 0.0);
+    light_color: vec3 = vec3.fromValues(0.0, 0.45, 0.7);
+    light_intensity: number = 1.1;
     specular_strength: number = 1.5;
     shininess: number = 1024.0;
 

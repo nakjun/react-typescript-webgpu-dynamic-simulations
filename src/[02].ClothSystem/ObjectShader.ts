@@ -64,23 +64,24 @@ export class ObjectShader {
     fn fs_main(@location(0) TexCoord : vec2<f32>, @location(1) Normal : vec3<f32>, @location(2) FragPos: vec3<f32>) -> @location(0) vec4<f32> {            
         
         let lightPos: vec3<f32> = lightUBO.position;
-        let lightColor: vec4<f32> = lightUBO.color;
+        //let lightColor: vec4<f32> = lightUBO.color;
+        let lightColor: vec4<f32> = vec4<f32>(1.0,1.0,1.0,1.0);
         let lightIntensity: f32 = lightUBO.intensity;
         
         // 주변광 계산
-        let ambientColor: vec4<f32> = vec4<f32>(0.319551, 0.435879, 0.802236, 1.0);
+        let ambientColor: vec4<f32> = vec4<f32>(0.2, 0.2, 0.2, 1.0);
     
         // // diffuse 계산
         let norm: vec3<f32> = normalize(Normal);
         let lightDir: vec3<f32> = normalize(lightPos - FragPos);
         let diff: f32 = max(dot(norm, lightDir), 0.0);
-        let diffuse: vec4<f32> = lightColor * diff * lightIntensity * vec4<f32>(0.319551, 0.435879, 0.802236, 1.0);
+        let diffuse: vec4<f32> = lightColor * diff * lightIntensity * vec4<f32>(0.88, 0.88, 0.88, 1.0);
     
         // // specular 계산
         let viewDir: vec3<f32> = normalize(cameraPos - FragPos);
         let reflectDir: vec3<f32> = reflect(-lightDir, norm);
-        let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), 16);
-        let specular: vec4<f32> = lightColor * spec * vec4<f32>(0.429134, 0.429134, 0.429134, 1.0);
+        let spec: f32 = pow(max(dot(viewDir, reflectDir), 0.0), 1);
+        let specular: vec4<f32> = lightColor * spec * vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
         // // 최종 색상 계산
         var finalColor: vec4<f32> = ambientColor + diffuse + specular + vec4<f32>(0.000000, 0.000000, 0.000000, 1.0);        

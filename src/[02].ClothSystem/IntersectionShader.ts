@@ -193,7 +193,7 @@ export class IntersectionShader {
         var fix = fixed[x];
         if(fix==1) {return;}
 
-        var pos = getPrevPosition(x);        
+        var pos = getClothVertexPosition(x);        
         var vel = getClothVertexVelocity(x);
 
         let tempX = atomicLoad(&tempBuffer[x * 3 + 0].value);
@@ -205,11 +205,11 @@ export class IntersectionShader {
 
         if(countBufferData>0)
         {
-            vel *= -0.0001;
+            vel *= -0.0;
             
-            pos.x += (separatePos.x * 0.03);
-            pos.y += (separatePos.y * 0.03);
-            pos.z += (separatePos.z * 0.03);
+            pos.x += (separatePos.x * 0.01);
+            pos.y += (separatePos.y * 0.01);
+            pos.z += (separatePos.z * 0.01);
 
             velocities[x*3 + 0] = vel.x;
             velocities[x*3 + 1] = vel.y;
