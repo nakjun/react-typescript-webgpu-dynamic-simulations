@@ -109,8 +109,8 @@ export class ClothRenderer extends RendererOrigin {
 
     kD: number = 0;
 
-    xSize: number = 100.0;
-    ySize: number = 100.0;
+    xSize: number = 70.0;
+    ySize: number = 70.0;
 
     //for temp storage buffer
     maxSpringConnected: number = 0;
@@ -290,7 +290,7 @@ export class ClothRenderer extends RendererOrigin {
         this.InitNodeForce(commandEncoder);
         this.updateSprings(commandEncoder);
         this.summationNodeForce(commandEncoder);
-        //this.Intersections(commandEncoder);
+        this.Intersections(commandEncoder);
 
 
         this.updateParticles(commandEncoder);
@@ -332,7 +332,8 @@ export class ClothRenderer extends RendererOrigin {
 
         //this.model = await loader.load('./objects/skybox.obj', 10.0);
         //this.model = await loader.load('./objects/bunny.obj', 100.0);
-        this.model = await loader.load('./objects/sphere.obj', 20.0);
+        //this.model = await loader.load('./objects/sphere.obj', 20.0);
+        this.model = await loader.load('./objects/armadillo4.obj', 30.0);
         //this.model = await loader.load('./objects/dragon2.obj', 2.0);
 
         console.log("object file load end");
@@ -789,8 +790,8 @@ export class ClothRenderer extends RendererOrigin {
     createParticles() {
         // N * M 그리드의 노드를 생성하는 로직
         //20x20 cloth
-        const start_x = 45;
-        const start_y = 45;
+        const start_x = 35;
+        const start_y = 35;
 
         // const start_x = 15;
         // const start_y = 10;

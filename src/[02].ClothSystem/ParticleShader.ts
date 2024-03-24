@@ -224,27 +224,31 @@ export class ParticleShader {
                 pos.z += 0.05;
                 flag = true;
             }
+
+            if(pos.z >= 150.0){
+                fixed[index] = u32(1);
+            }
         }
 
         if(flag==false){
             
-            var origin_location:vec3<f32> = vec3<f32>(0.0,0.0,0.0);
+            // var origin_location:vec3<f32> = vec3<f32>(0.0,0.0,0.0);
     
-            if(distance(pos, origin_location) < 20.0){
-                var dir = normalize(origin_location-pos);
-                pos += (-dir*0.25);
-                vel *= 0.3;
-            }
+            // if(distance(pos, origin_location) < 20.0){
+            //     var dir = normalize(origin_location-pos);
+            //     pos += (-dir*0.25);
+            //     vel *= 0.3;
+            // }
             
             //floor collisions
-            if(pos.y < -20.0){
-                pos.y += 0.0001;  
+            if(pos.y < -10.0){
+                pos.y += 0.01;  
                 vel *= -0.3;      
             }
         }
         
         var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);        
-        var deltaTime: f32 = 0.003; // Assuming 60 FPS for simplicity
+        var deltaTime: f32 = 0.001; // Assuming 60 FPS for simplicity
         vel += ((f + gravity) * deltaTime);
         pos += (vel * deltaTime);
         
