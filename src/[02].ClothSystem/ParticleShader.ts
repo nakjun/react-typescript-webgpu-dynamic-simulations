@@ -139,7 +139,7 @@ export class ParticleShader {
         //     finalColor = finalColor + diffuse + specular;
         // }
         
-        // finalColor.a = 0.8; // 텍스처의 알파 값을 최종 색상의 알파 값으로 설정
+        // finalColor.a = 1.0; // 텍스처의 알파 값을 최종 색상의 알파 값으로 설정
         // return finalColor;
 
         let lightPos: vec3<f32> = lightUBO.position;
@@ -175,91 +175,109 @@ export class ParticleShader {
     freefallComputeShader = `
     
     @group(0) @binding(0) var<storage, read_write> positions: array<f32>;
-    @group(0) @binding(1) var<storage, read_write> velocities: array<f32>;    
-    @group(0) @binding(2) var<storage, read_write> fixed: array<u32>;
-    @group(0) @binding(3) var<storage, read_write> force: array<f32>;   
-    @group(0) @binding(4) var<storage, read_write> prevPosition: array<f32>;
-    @group(0) @binding(5) var<uniform> externalForce : vec3<f32>;    
+@group(0) @binding(1) var<storage, read_write> velocities: array<f32>;    
+@group(0) @binding(2) var<storage, read_write> fixed: array<u32>;
+@group(0) @binding(3) var<storage, read_write> force: array<f32>;   
+@group(0) @binding(4) var<storage, read_write> prevPosition: array<f32>;
+@group(0) @binding(5) var<uniform> externalForce: vec3<f32>;    
 
-    fn getPosition(index:u32) -> vec3<f32>{
-        return vec3<f32>(positions[index*3],positions[index*3+1],positions[index*3+2]);
+fn getPosition(index:u32) -> vec3<f32>{
+    return vec3<f32>(positions[index*3],positions[index*3+1],positions[index*3+2]);
+}
+
+fn getVelocity(index:u32) -> vec3<f32>{
+    return vec3<f32>(velocities[index*3],velocities[index*3+1],velocities[index*3+2]);
+}
+
+fn getForce(index:u32) -> vec3<f32>{
+    return vec3<f32>(force[index*3] / 2.0,force[index*3+1] / 2.0,force[index*3+2] / 2.0);
+}
+
+@compute 
+@workgroup_size(256)
+fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let index: u32 = global_id.x;
+    var fix = fixed[index];
+    
+    var pos = getPosition(index);
+    if(fixed[0]==1){
+        var origin_pos = getPosition(0);
+        var dist = distance(origin_pos, pos);
+        if(dist < 33.0)
+        {
+            fixed[index] = u32(1);
+        }
+    }
+
+    if(fix==1){
+        return;
     }
     
-    fn getVelocity(index:u32) -> vec3<f32>{
-        return vec3<f32>(velocities[index*3],velocities[index*3+1],velocities[index*3+2]);
-    }
+    var vel = getVelocity(index);
+    var f = getForce(index) * 0.5;     
+    
+    prevPosition[index*3 + 0] = pos.x;
+    prevPosition[index*3 + 1] = pos.y;
+    prevPosition[index*3 + 2] = pos.z;
 
-    fn getForce(index:u32) -> vec3<f32>{
-        return vec3<f32>(force[index*3] / 2.0,force[index*3+1] / 2.0,force[index*3+2] / 2.0);
-    }
-
-    @compute 
-    @workgroup_size(256)
-    fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-        let index: u32 = global_id.x;
-        var fix = fixed[index];
+    if(externalForce.z!=0.0){                                    
+        var origin_pos = getPosition(0);
+        var dist = distance(origin_pos, pos);
         
-        if(fix==1){
-            return;
-        }
-        
-        var pos = getPosition(index);
-        var vel = getVelocity(index);
-        var f = getForce(index);     
-        
-        prevPosition[index*3 + 0] = pos.x;
-        prevPosition[index*3 + 1] = pos.y;
-        prevPosition[index*3 + 2] = pos.z;
-        var flag:bool = false;
-        if(externalForce.z!=0.0){                                    
-            var origin_pos = getPosition(0);
-            var dist = distance(origin_pos, pos);
-            if(dist < 20.0)
-            {
-                vel *= 0.3;
-                f *= 0.0;
-                if(pos.y >= -20.0){
-                    pos.y -= 0.01;
-                }                
-                pos.z += 0.05;
-                flag = true;
+        if(dist < 30.0 && fixed[0]==0)
+        {
+            vel *= 0.5;                        
+            if(pos.z <= 135.0){
+                pos.z += 0.5;                
+                //pos.y += 0.1;
             }
-
-            if(pos.z >= 150.0){
+            else{
                 fixed[index] = u32(1);
             }
         }
+    }
 
-        if(flag==false){
-            
-            // var origin_location:vec3<f32> = vec3<f32>(0.0,0.0,0.0);
+    // 구체와의 충돌 검출 및 처리
+    var sphereCenter: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0); // 구체의 중심 위치
+    var sphereRadius: f32 = 20.05; // 구체의 반지름
+    var toCenter = pos - sphereCenter;
+    var distanceToCenter = length(toCenter);
+
+    if(distanceToCenter < sphereRadius){
+        var penetrationDepth = sphereRadius - distanceToCenter;
+        var correctionVector = normalize(toCenter) * penetrationDepth;
+        pos += correctionVector;
+        vel *= 0.2; // 속도 감소를 통한 에너지 소산
+        vel += normalize(toCenter) * 5.0;
+    }
+
+    // 마찰력 적용
+    if(distanceToCenter < sphereRadius + 0.01){
+        var frictionCoefficient: f32 = 0.001; // 마찰 계수
+        var normal = normalize(toCenter);
+        var tangentVelocity = vel - dot(vel, normal) * normal;
+        vel -= tangentVelocity * frictionCoefficient;
+    }
+
+    if(pos.y <= -30.0){
+        pos.y += 0.01;
+        vel *= 0.05;
+    }
+
+    var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);        
+    var deltaTime: f32 = 0.005; // 가정된 프레임 속도에 따른 시간 차
+    vel += ((f + gravity) * deltaTime);
+    pos += (vel * deltaTime);
     
-            // if(distance(pos, origin_location) < 20.0){
-            //     var dir = normalize(origin_location-pos);
-            //     pos += (-dir*0.25);
-            //     vel *= 0.3;
-            // }
-            
-            //floor collisions
-            if(pos.y < -10.0){
-                pos.y += 0.01;  
-                vel *= -0.3;      
-            }
-        }
-        
-        var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);        
-        var deltaTime: f32 = 0.001; // Assuming 60 FPS for simplicity
-        vel += ((f + gravity) * deltaTime);
-        pos += (vel * deltaTime);
-        
-        velocities[index*3 + 0] = vel.x;
-        velocities[index*3 + 1] = vel.y;
-        velocities[index*3 + 2] = vel.z;
+    velocities[index*3 + 0] = vel.x;
+    velocities[index*3 + 1] = vel.y;
+    velocities[index*3 + 2] = vel.z;
 
-        positions[index*3 + 0] = pos.x;
-        positions[index*3 + 1] = pos.y;
-        positions[index*3 + 2] = pos.z;
-    }    
+    positions[index*3 + 0] = pos.x;
+    positions[index*3 + 1] = pos.y;
+    positions[index*3 + 2] = pos.z;
+}
+
     `;
 
     getParticleShader() {

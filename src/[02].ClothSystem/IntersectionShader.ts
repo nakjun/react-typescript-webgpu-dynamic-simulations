@@ -205,11 +205,15 @@ export class IntersectionShader {
 
         if(countBufferData>0)
         {
-            vel *= -0.0;
+            vel *= -0.1;
             
-            pos.x += (separatePos.x * 0.03);
-            pos.y += (separatePos.y * 0.03);
-            pos.z += (separatePos.z * 0.03);
+            pos.x += (separatePos.x * 0.01);
+            pos.y += (separatePos.y * 0.01);
+            pos.z += (separatePos.z * 0.01);
+
+            vel.x += (separatePos.x*1.5);
+            vel.y += (separatePos.y*1.5);
+            vel.z += (separatePos.z*1.5);
 
             velocities[x*3 + 0] = vel.x;
             velocities[x*3 + 1] = vel.y;
