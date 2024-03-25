@@ -80,8 +80,9 @@ const startClothSimluation = async () => {
       sceneManager.zoomCamera(event.deltaY / 100);
     });
     //sceneManager.createClothModel(2, 2, 200.0, 150.0, 1000.0, 0.5);  
-    //sceneManager.createClothModel(3, 3, 500.0, 250.0, 1500.0, 0.3);
-    sceneManager.createClothModel(128, 128, 250000.0, 250000.0, 250000.0, 50);
+    //sceneManager.createClothModel(70, 70, 10000.0, 10000.0, 21000.0, 1.0);
+    sceneManager.createClothModel(210, 210, 150000.0, 150000.0, 219000.0, 3.0);
+    //sceneManager.createClothModel(512, 512, 200000.0, 200000.0, 350000.0, 1);
     //sceneManager.createClothModel(400, 400, 1200000.0, 1200000.0, 2500000.0, 1000);
     //sceneManager.createClothModel(200, 200, 10000.0, 3500.0, 65000.0, 0.1);    
     //sceneManager.createClothModel(400, 400, 15000.0, 5000.0, 95000.0, 0.001);

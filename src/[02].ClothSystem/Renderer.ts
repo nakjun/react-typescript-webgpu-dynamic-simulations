@@ -109,8 +109,8 @@ export class ClothRenderer extends RendererOrigin {
 
     kD: number = 0;
 
-    xSize: number = 70.0;
-    ySize: number = 70.0;
+    xSize: number = 300.0;
+    ySize: number = 300.0;
 
     //for temp storage buffer
     maxSpringConnected: number = 0;
@@ -311,12 +311,13 @@ export class ClothRenderer extends RendererOrigin {
 
     /* Create Data */
     createSphereModel() {
-        this.sphereRadious = 1.0;
+        this.sphereRadious = 4.0;
         this.sphereSegments = 64;
         this.spherePosition = vec3.fromValues(30.0, 30.0, -10.0);
         var sphere = this.modelGenerator.createSphere(this.sphereRadious, this.sphereSegments, this.spherePosition);
 
-        var sphere2 = this.modelGenerator.createSphere(this.sphereRadious, this.sphereSegments, vec3.fromValues(99.453125, 30.0, -10.0));
+        var sphere2 = this.modelGenerator.createSphere(this.sphereRadious, this.sphereSegments, vec3.fromValues(327.0
+            , 30.0, -10.0));
 
         var vertArray = new Float32Array([...sphere.vertices, ...sphere2.vertices]);
         //var indArray = new Uint32Array(sphere.indices);
@@ -1113,7 +1114,7 @@ export class ClothRenderer extends RendererOrigin {
         //0, N fix       
         this.particles[0].fixed = true;
         this.particles[this.N-1].fixed = true;
-        //console.log(this.particles[this.N-1].position)
+        console.log(this.particles[this.N-1].position)
 
         this.numParticles = this.particles.length;
         console.log("make #", this.numParticles, " particles create success");

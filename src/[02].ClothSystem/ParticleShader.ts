@@ -184,15 +184,15 @@ export class ParticleShader {
         
         var pos = getPosition(index);
         var vel = getVelocity(index);
-        var f = getForce(index) * 0.05;     
+        var f = getForce(index)*0.1;     
         
         prevPosition[index*3 + 0] = pos.x;
         prevPosition[index*3 + 1] = pos.y;
         prevPosition[index*3 + 2] = pos.z;
         
-        var gravity: vec3<f32> = vec3<f32>(0.0, -4.9, 0.0);        
-        var deltaTime: f32 = 0.003; // Assuming 60 FPS for simplicity
-        vel += ((f + vec3<f32>(0.0, 0.0, 3.0) + gravity) * deltaTime);
+        var gravity: vec3<f32> = vec3<f32>(0.0, -9.8, 0.0);        
+        var deltaTime: f32 = 0.005; // Assuming 60 FPS for simplicity
+        vel += ((f + vec3<f32>(0.0, 0.0, 9.8) + gravity) * deltaTime);
         pos += (vel * deltaTime);
         
         velocities[index*3 + 0] = vel.x;

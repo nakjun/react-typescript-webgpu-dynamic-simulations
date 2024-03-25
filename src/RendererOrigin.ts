@@ -16,8 +16,8 @@ export class RendererOrigin {
 
     //camera
     camera!: Camera;
-    camera_position: vec3 = vec3.fromValues(-16, 31, 85);
-    camera_target: vec3 = vec3.fromValues(70, -17.3, -16.5);
+    camera_position: vec3 = vec3.fromValues(-250, -10, 535);
+    camera_target: vec3 = vec3.fromValues(109.7, -194.3, -4.3);
     camera_up: vec3 = vec3.fromValues(0.0, 1.0, 0.0);
 
     //lighting
@@ -53,7 +53,7 @@ export class RendererOrigin {
     lightColorZControl: any;
 
     renderOptions = {
-        wireFrame: false,
+        wireFrame: true,
         camPosX: this.camera_position[0],
         camPosY: this.camera_position[1],
         camPosZ: this.camera_position[2],
@@ -96,13 +96,13 @@ export class RendererOrigin {
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'renderObject').name('renderObject');
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'moveObject').name('moveObject');
         this.systemGUI.renderOptionGui.add(this.renderOptions, 'wind').name('Apply Wind');
-        this.camPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosX', -500, 500).name('Camera Position X').onChange((value: number) => {
+        this.camPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosX', -1000, 1000).name('Camera Position X').onChange((value: number) => {
             this.camera.position[0] = value;
         });
-        this.camPosYControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosY', -500, 500).name('Camera Position Y').onChange((value: number) => {
+        this.camPosYControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosY', -1000, 1000).name('Camera Position Y').onChange((value: number) => {
             this.camera.position[1] = value;
         });
-        this.camPosZControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosZ', -500, 500).name('Camera Position Z').onChange((value: number) => {
+        this.camPosZControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'camPosZ', -1000, 1000).name('Camera Position Z').onChange((value: number) => {
             this.camera.position[2] = value;
         });
         this.lightPosXControl = this.systemGUI.renderOptionGui.add(this.renderOptions, 'lightPosX', -500, 500).name('Light Position X').onChange((value: number) => {
