@@ -1,25 +1,31 @@
-# WebGPU Dynamic Simulation Framework
+# Real-Time Mass-Spring Simulation System using WebGPU Frameworks
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
-
-## Videos
-[![videos](https://img.youtube.com/vi/V2d5ykCYyx0/0.jpg)](https://www.youtube.com/watch?v=V2d5ykCYyx0)
+### Setup & Run Projects
+```shell
+$npm install #install npm dependencies(react, webgpu, ...)
+$npm run start #start react app
+#Open https://localhost:3000 to view it in the browser.
+```
 
 ## Features
-- Cloth Pulling Simulations in WebGPU
-- target object(dragon)   : 13,129 vertices, 26,258 triangles
-- cloth object　　　　　: 14,400 vertices, 85,082 springs, 28,322 triangles
-- method　　　　　　   : Mass-Spring System(without self-collision)
+- Mass-Spring System : Spring-centric method without Self-Collision
+- Collision System : [Detection Part] AABB-based BVH(Broad Phase) + Tri-Tri Intersection(Narrow Phase) / [Response Part] Triangle-Repsonse Method
+- Rendering System : WebGPU Renderer
+- 3D Surface models
+    - Sphere : 0.4K Vertices, 0.9K Triangles(Faces)
+    - Armadillo : 25.3K Vertices, 50.6K Triangles(Faces)
+    - Dragon   : 50K Vertices, 100K Triangles(Faces)
 
 
-## Available Scripts
+## Experimental Videos
+[![videos](https://img.youtube.com/vi/AXY6gcJpZYQ/0.jpg)](https://youtu.be/AXY6gcJpZYQ)
 
-In the project directory, you can run:
-
-### `npm start`
-
-Runs the app in the development mode.\
-Open [https://localhost:3000](https://localhost:3000) to view it in the browser.
-
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## Cite This Projects
+```bibtex
+@misc{ClothSimulationWebGPU,
+  author       = {Nak-Jun Sung},
+  title        = {Real-Time Cloth Simulation Using WebGPU: Evaluating Limits of High-Resolution},  
+  year         = {2024},  
+  doi          = {}
+}
+```
