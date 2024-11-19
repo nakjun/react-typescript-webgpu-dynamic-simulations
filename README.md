@@ -1,5 +1,7 @@
 # Real-Time Mass-Spring Simulation System using WebGPU Frameworks
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14186494.svg)](https://doi.org/10.5281/zenodo.14186494)
+
 ### Setup & Run Projects
 ```shell
 $npm install #install npm dependencies(react, webgpu, ...)
@@ -21,11 +23,12 @@ $npm run start #start react app
 [![videos](https://img.youtube.com/vi/AXY6gcJpZYQ/0.jpg)](https://youtu.be/AXY6gcJpZYQ)
 
 ## Cite This Projects
+※ This project is currently being prepared for submission to a peer-reviewed journal.
 ```bibtex
 @misc{ClothSimulationWebGPU,
   author       = {Nak-Jun Sung},
   title        = {Real-Time Cloth Simulation Using WebGPU: Evaluating Limits of High-Resolution},  
   year         = {2024},  
-  doi          = {}
+  doi          = {https://doi.org/10.5281/zenodo.14186494}
 }
 ```
